@@ -12,22 +12,26 @@
 #pragma once
 
 #include "DXSample.h"
-#include "StepTimer.h"
 #include "RaytracingHlslCompat.h"
+#include "StepTimer.h"
 
-namespace GlobalRootSignatureParams {
-    enum Value { 
-        OutputViewSlot = 0,
-        AccelerationStructureSlot,
-        Count 
-    };
+namespace GlobalRootSignatureParams
+{
+enum Value
+{
+    OutputViewSlot = 0,
+    AccelerationStructureSlot,
+    Count
+};
 }
 
-namespace LocalRootSignatureParams {
-    enum Value {
-        ViewportConstantSlot = 0,
-        Count 
-    };
+namespace LocalRootSignatureParams
+{
+enum Value
+{
+    ViewportConstantSlot = 0,
+    Count
+};
 }
 class ShaderTable;
 class D3D12RaytracingHelloWorld : public DXSample
@@ -45,15 +49,15 @@ public:
     virtual void OnRender() override;
     virtual void OnSizeChanged(UINT width, UINT height, bool minimized) override;
     virtual void OnDestroy() override;
+    virtual void OnMouseMove(UINT /*x*/, UINT /*y*/) override;
     virtual IDXGISwapChain* GetSwapchain() override
     {
         return m_deviceResources->GetSwapChain();
     }
 
 private:
-
     static const UINT FrameCount = 3;
-        
+
     // DirectX Raytracing (DXR) attributes
     ComPtr<ID3D12Device5> m_dxrDevice;
     ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
@@ -67,13 +71,16 @@ private:
     ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
     UINT m_descriptorsAllocated;
     UINT m_descriptorSize;
-    
+
     // Raytracing scene
     RayGenConstantBuffer m_rayGenCB;
 
     // Geometry
     typedef UINT16 Index;
-    struct Vertex { float v1, v2, v3; };
+    struct Vertex
+    {
+        float v1, v2, v3;
+    };
     ComPtr<ID3D12Resource> m_indexBuffer;
     ComPtr<ID3D12Resource> m_vertexBuffer;
 
@@ -104,13 +111,14 @@ private:
     StepTimer m_timer;
 
     void RecreateD3D();
-    void DoRaytracing();   
+    void DoRaytracing();
     void CreateDeviceDependentResources();
     void CreateWindowSizeDependentResources();
     void ReleaseDeviceDependentResources();
     void ReleaseWindowSizeDependentResources();
     void CreateRaytracingInterfaces();
-    void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC& desc, ComPtr<ID3D12RootSignature>* rootSig);
+    void SerializeAndCreateRaytracingRootSignature(D3D12_ROOT_SIGNATURE_DESC& desc,
+                                                   ComPtr<ID3D12RootSignature>* rootSig);
     void CreateRootSignatures();
     void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
     void CreateRaytracingPipelineStateObject();
