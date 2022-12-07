@@ -751,12 +751,12 @@ UINT D3D12RaytracingHelloWorld::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* 
 
 void D3D12RaytracingHelloWorld::OnMouseMove(UINT x, UINT y)
 {
-    static float lastX = x;
-    static float lastY = y;
+    static float lastX = (float)x;
+    static float lastY = (float)y;
     float deltaX = x - lastX;
     float deltaY = y - lastY;
-    lastX = x;
-    lastY = y;
+    lastX = (float)x;
+    lastY = (float)y;
 
     if (mouseRotateMode)
     {
