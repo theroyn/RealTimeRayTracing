@@ -201,6 +201,10 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         {
             pSample->OnKeyDown(static_cast<UINT8>(wParam));
         }
+        if (wParam == VK_ESCAPE)
+        {
+            PostQuitMessage(0);
+        }
         return 0;
 
     case WM_KEYUP:
@@ -220,7 +224,6 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
                 return 0;
             }
         }
-        // Send all other WM_SYSKEYDOWN messages to the default WndProc.
         break;
 
     case WM_PAINT:
@@ -265,7 +268,7 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         return 0;
 
     case WM_MOUSEMOVE:
-        if (pSample && static_cast<UINT8>(wParam) == MK_LBUTTON)
+        if (pSample /*&& static_cast<UINT8>(wParam) == MK_LBUTTON*/)
         {
             UINT x = LOWORD(lParam);
             UINT y = HIWORD(lParam);

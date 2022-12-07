@@ -11,6 +11,7 @@
 
 #pragma once
 
+#include "Camera.h"
 #include "DXSample.h"
 #include "RaytracingHlslCompat.h"
 #include "StepTimer.h"
@@ -49,7 +50,9 @@ public:
     virtual void OnRender() override;
     virtual void OnSizeChanged(UINT width, UINT height, bool minimized) override;
     virtual void OnDestroy() override;
-    virtual void OnMouseMove(UINT /*x*/, UINT /*y*/) override;
+    virtual void OnMouseMove(UINT x, UINT y) override;
+    virtual void OnKeyDown(UINT8 key) override;
+    virtual void OnKeyUp(UINT8 key) override;
     virtual IDXGISwapChain* GetSwapchain() override
     {
         return m_deviceResources->GetSwapChain();
@@ -103,6 +106,8 @@ private:
     ComPtr<ID3D12Resource> m_hitGroupShaderTable;
     ComPtr<ID3D12Resource> m_rayGenShaderTable;
     std::shared_ptr<ShaderTable> m_actualRayGenShaderTable;
+    std::shared_ptr<Camera> m_cam;
+    bool mouseRotateMode = false;
     void* m_rayGenShaderIdentifier;
     UINT m_shaderIdentifierSize;
     void InitRayGenTable();

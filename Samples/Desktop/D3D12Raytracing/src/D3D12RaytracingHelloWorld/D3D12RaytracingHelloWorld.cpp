@@ -8,11 +8,11 @@
 // PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
 //
 //*********************************************************
-
-#include "D3D12RaytracingHelloWorld.h"
-#include "CompiledShaders\Raytracing.hlsl.h"
-#include "DirectXRaytracingHelper.h"
 #include "stdafx.h"
+
+#include "CompiledShaders\Raytracing.hlsl.h"
+#include "D3D12RaytracingHelloWorld.h"
+#include "DirectXRaytracingHelper.h"
 
 #include <chrono>
 using namespace std;
@@ -27,6 +27,10 @@ D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, st
     : DXSample(width, height, name), m_raytracingOutputResourceUAVDescriptorHeapIndex(UINT_MAX)
 {
     m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
+    XMVECTOR lookfrom{ std::sin(m_rayGenCB.timeNow * .01f), 0.f, 1.f, 1.f };
+    XMVECTOR lookat{ 0.f, 0.f, -1.f, 1.f };
+    XMVECTOR vup{ 0., 1., 0. };
+    m_cam = std::make_shared<Camera>(lookfrom, lookat, vup);
     InitCamera();
     UpdateForSizeChange(width, height);
 }
@@ -36,14 +40,14 @@ void D3D12RaytracingHelloWorld::InitCamera()
     using namespace DirectX;
     // m_rayGenCB.origin = XMFLOAT3{ 0.f, 0.f, 1.f };
     // XMVECTOR lookfrom{ 0.f, 0.f, 1.f };
-    XMVECTOR lookfrom{ std::sin(m_rayGenCB.timeNow * .01f), 0.f, 1.f };
-    XMVECTOR lookat{ 0.f, 0.f, -1.f };
+    XMVECTOR lookfrom = m_cam->GetLookFrom();
+    XMVECTOR forward = m_cam->GetForward();
+    XMVECTOR up = m_cam->GetUp();
+    XMVECTOR right = m_cam->GetRight();
+    // XMVECTOR forward = XMVector3Normalize(lookat - lookfrom);
 
-    XMVECTOR forward = XMVector3Normalize(lookat - lookfrom);
-    XMVECTOR vup{ 0., 1., 0. };
-
-    XMVECTOR right = XMVector3Normalize(XMVector3Cross(forward, vup));
-    XMVECTOR up = XMVector3Normalize(XMVector3Cross(right, forward));
+    // XMVECTOR right = XMVector3Normalize(XMVector3Cross(forward, vup));
+    // XMVECTOR up = XMVector3Normalize(XMVector3Cross(right, forward));
 
     float aspectRatio = (float)GetWidth() / (float)GetHeight();
     float vpHeight = 2.f;
@@ -518,6 +522,7 @@ void D3D12RaytracingHelloWorld::OnUpdate()
                                                .count());
     m_rayGenCB.timeNow = timeInMilli;
     InitCamera();
+    // m_cam->RotateRight(std::sin(timeInMilli * .0001f));
     // m_rayGenCB.origin = XMFLOAT3{ std::sin(timeInMilli * .001f)*3.f, 0.f, 0.f };
     InitRayGenTable();
     /*   ReleaseWindowSizeDependentResources();
@@ -744,4 +749,66 @@ UINT D3D12RaytracingHelloWorld::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* 
     return descriptorIndexToUse;
 }
 
-void D3D12RaytracingHelloWorld::OnMouseMove(UINT x, UINT y) {}
+void D3D12RaytracingHelloWorld::OnMouseMove(UINT x, UINT y)
+{
+    static float lastX = x;
+    static float lastY = y;
+    float deltaX = x - lastX;
+    float deltaY = y - lastY;
+    lastX = x;
+    lastY = y;
+
+    if (mouseRotateMode)
+    {
+        m_cam->RotateRight(deltaX);
+        m_cam->RotateUp(deltaY);
+    }
+}
+
+void D3D12RaytracingHelloWorld::OnKeyDown(UINT8 key)
+{
+    switch (key)
+    {
+    case 'W':
+    case 'w':
+    {
+        m_cam->MoveForward(1.f);
+    }
+    break;
+    case 'S':
+    case 's':
+    {
+        m_cam->MoveForward(-1.f);
+    }
+    break;
+    case 'D':
+    case 'd':
+    {
+        m_cam->MoveRight(1.f);
+    }
+    break;
+    case 'A':
+    case 'a':
+    {
+        m_cam->MoveRight(-1.f);
+    }
+    break;
+    case VK_CONTROL:
+        mouseRotateMode = true;
+        break;
+    default:
+        break;
+    }
+}
+
+void D3D12RaytracingHelloWorld::OnKeyUp(UINT8 key)
+{
+    switch (key)
+    {
+    case VK_CONTROL:
+        mouseRotateMode = false;
+        break;
+    default:
+        break;
+    }
+}
