@@ -86,6 +86,11 @@ public:
         shaderRecord.CopyTo(m_mappedShaderRecords);
         m_mappedShaderRecords += m_shaderRecordSize;
     }
+    void ModifyFirstRecord(const ShaderRecord& shaderRecord)
+    {
+        m_shaderRecords[0] = shaderRecord;
+        shaderRecord.CopyTo(m_mappedShaderRecords - m_shaderRecordSize);
+    }
 
     UINT GetShaderRecordSize() { return m_shaderRecordSize; }
 

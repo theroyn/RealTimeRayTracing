@@ -11,7 +11,15 @@
 
 #ifndef RAYTRACINGHLSLCOMPAT_H
 #define RAYTRACINGHLSLCOMPAT_H
-
+#ifdef HLSL
+#include "HlslCompat.h"
+#else
+#include <DirectXMath.h>
+//#pragma pack(4)
+using XMFLOAT4 = DirectX::XMFLOAT4;
+using XMFLOAT3 = DirectX::XMFLOAT3;
+using XMVECTOR = DirectX::XMVECTOR;
+#endif
 struct Viewport
 {
     float left;
@@ -19,11 +27,29 @@ struct Viewport
     float right;
     float bottom;
 };
-
+// origin, leftCorner, vpHorizontal, vpVertical
 struct RayGenConstantBuffer
 {
     Viewport viewport;
+
     Viewport stencil;
+
+    XMFLOAT3 origin;
+    float timeNow;
+
+    XMFLOAT3 leftCorner;
+    float pad1;
+
+    XMFLOAT3 vpHorizontal;
+    float pad2;
+
+    XMFLOAT3 vpVertical;
+    //  float pad3;
+    // XMFLOAT3 padding;
+    float pad3[9];
 };
+#ifndef HLSL
+//#pragma pack(16)
+#endif
 
 #endif // RAYTRACINGHLSLCOMPAT_H

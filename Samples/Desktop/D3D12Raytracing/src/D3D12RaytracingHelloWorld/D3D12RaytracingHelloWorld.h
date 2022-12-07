@@ -29,7 +29,7 @@ namespace LocalRootSignatureParams {
         Count 
     };
 }
-
+class ShaderTable;
 class D3D12RaytracingHelloWorld : public DXSample
 {
 public:
@@ -40,12 +40,15 @@ public:
     virtual void OnDeviceRestored() override;
 
     // Messages
-    virtual void OnInit();
-    virtual void OnUpdate();
-    virtual void OnRender();
-    virtual void OnSizeChanged(UINT width, UINT height, bool minimized);
-    virtual void OnDestroy();
-    virtual IDXGISwapChain* GetSwapchain() { return m_deviceResources->GetSwapChain(); }
+    virtual void OnInit() override;
+    virtual void OnUpdate() override;
+    virtual void OnRender() override;
+    virtual void OnSizeChanged(UINT width, UINT height, bool minimized) override;
+    virtual void OnDestroy() override;
+    virtual IDXGISwapChain* GetSwapchain() override
+    {
+        return m_deviceResources->GetSwapChain();
+    }
 
 private:
 
@@ -92,7 +95,11 @@ private:
     ComPtr<ID3D12Resource> m_missShaderTable;
     ComPtr<ID3D12Resource> m_hitGroupShaderTable;
     ComPtr<ID3D12Resource> m_rayGenShaderTable;
-    
+    std::shared_ptr<ShaderTable> m_actualRayGenShaderTable;
+    void* m_rayGenShaderIdentifier;
+    UINT m_shaderIdentifierSize;
+    void InitRayGenTable();
+    void InitCamera();
     // Application state
     StepTimer m_timer;
 

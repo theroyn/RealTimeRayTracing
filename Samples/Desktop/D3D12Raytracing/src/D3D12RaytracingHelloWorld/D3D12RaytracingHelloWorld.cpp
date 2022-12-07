@@ -14,6 +14,7 @@
 #include "DirectXRaytracingHelper.h"
 #include "CompiledShaders\Raytracing.hlsl.h"
 
+#include <chrono>
 using namespace std;
 using namespace DX;
 
@@ -27,18 +28,45 @@ D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, st
     m_raytracingOutputResourceUAVDescriptorHeapIndex(UINT_MAX)
 {
     m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
+    InitCamera();
     UpdateForSizeChange(width, height);
+}
+
+void D3D12RaytracingHelloWorld::InitCamera() 
+{
+    using namespace DirectX;
+    //m_rayGenCB.origin = XMFLOAT3{ 0.f, 0.f, 1.f };
+    //XMVECTOR lookfrom{ 0.f, 0.f, 1.f };
+    XMVECTOR lookfrom{ std::sin(m_rayGenCB.timeNow * .01f), 0.f, 1.f };
+    XMVECTOR lookat{ 0.f, 0.f, -1.f };
+
+    XMVECTOR forward = XMVector3Normalize(lookat - lookfrom);
+    XMVECTOR vup{ 0., 1., 0. };
+
+    XMVECTOR right = XMVector3Normalize(XMVector3Cross(forward, vup));
+    XMVECTOR up = XMVector3Normalize(XMVector3Cross(right, forward));
+
+     float aspectRatio = (float)GetWidth() / (float)GetHeight();
+     float vpHeight = 2.f;
+     float vpWidth = aspectRatio * vpHeight;
+
+     XMVECTOR vpHorizontal = vpWidth * right;
+     XMVECTOR vpVertical = vpHeight * up;
+     
+     XMVECTOR leftCorner = lookfrom + 1.f * forward - 0.5f * vpHorizontal - 0.5 * vpVertical;
+     int kaki = sizeof(m_rayGenCB);
+     XMStoreFloat3(&m_rayGenCB.origin, lookfrom);
+     XMStoreFloat3(&m_rayGenCB.leftCorner, leftCorner);
+     XMStoreFloat3(&m_rayGenCB.vpHorizontal, vpHorizontal);
+     XMStoreFloat3(&m_rayGenCB.vpVertical, vpVertical);
 }
 
 void D3D12RaytracingHelloWorld::OnInit()
 {
     m_deviceResources = std::make_unique<DeviceResources>(
-        DXGI_FORMAT_R8G8B8A8_UNORM,
-        DXGI_FORMAT_UNKNOWN,
-        FrameCount,
-        D3D_FEATURE_LEVEL_11_0,
-        // Sample shows handling of use cases with tearing support, which is OS dependent and has been supported since TH2.
-        // Since the sample requires build 1809 (RS5) or higher, we don't need to handle non-tearing cases.
+        DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, FrameCount, D3D_FEATURE_LEVEL_11_0,
+        // Sample shows handling of use cases with tearing support, which is OS dependent and has been supported since
+        // TH2. Since the sample requires build 1809 (RS5) or higher, we don't need to handle non-tearing cases.
         DeviceResources::c_RequireTearingSupport,
         m_adapterIDoverride
         );
@@ -270,7 +298,7 @@ void D3D12RaytracingHelloWorld::BuildGeometry()
         0, 1, 2
     };
 
-    float depthValue = 1.0;
+    float depthValue = -1.0;
     float offset = 0.7f;
     Vertex vertices[] =
     {
@@ -278,8 +306,8 @@ void D3D12RaytracingHelloWorld::BuildGeometry()
         // Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
         // Define the vertices in counter clockwise order ~ clockwise in left handed.
         { 0, -offset, depthValue },
+        { offset, offset, depthValue },
         { -offset, offset, depthValue },
-        { offset, offset, depthValue }
     };
 
     AllocateUploadBuffer(device, vertices, sizeof(vertices), &m_vertexBuffer);
@@ -391,30 +419,42 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
     m_deviceResources->WaitForGpu();
 }
 
+void D3D12RaytracingHelloWorld::InitRayGenTable()
+{
+    struct RootArguments
+    {
+        RayGenConstantBuffer cb;
+    } rootArguments;
+    rootArguments.cb = m_rayGenCB;
+
+    UINT numShaderRecords = 1;
+    UINT shaderRecordSize = m_shaderIdentifierSize + sizeof(rootArguments);
+    m_actualRayGenShaderTable->ModifyFirstRecord(
+        ShaderRecord(m_rayGenShaderIdentifier, m_shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+}
 // Build shader tables.
 // This encapsulates all shader records - shaders and the arguments for their local root signatures.
 void D3D12RaytracingHelloWorld::BuildShaderTables()
 {
     auto device = m_deviceResources->GetD3DDevice();
 
-    void* rayGenShaderIdentifier;
+    //void* rayGenShaderIdentifier;
     void* missShaderIdentifier;
     void* hitGroupShaderIdentifier;
 
     auto GetShaderIdentifiers = [&](auto* stateObjectProperties)
     {
-        rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+        m_rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
         missShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
         hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
     };
 
     // Get shader identifiers.
-    UINT shaderIdentifierSize;
     {
         ComPtr<ID3D12StateObjectProperties> stateObjectProperties;
         ThrowIfFailed(m_dxrStateObject.As(&stateObjectProperties));
         GetShaderIdentifiers(stateObjectProperties.Get());
-        shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
+        m_shaderIdentifierSize = D3D12_SHADER_IDENTIFIER_SIZE_IN_BYTES;
     }
 
     // Ray gen shader table
@@ -425,27 +465,29 @@ void D3D12RaytracingHelloWorld::BuildShaderTables()
         rootArguments.cb = m_rayGenCB;
 
         UINT numShaderRecords = 1;
-        UINT shaderRecordSize = shaderIdentifierSize + sizeof(rootArguments);
-        ShaderTable rayGenShaderTable(device, numShaderRecords, shaderRecordSize, L"RayGenShaderTable");
-        rayGenShaderTable.push_back(ShaderRecord(rayGenShaderIdentifier, shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
-        m_rayGenShaderTable = rayGenShaderTable.GetResource();
+        UINT shaderRecordSize = m_shaderIdentifierSize + sizeof(rootArguments);
+        m_actualRayGenShaderTable.reset(new ShaderTable(device, numShaderRecords, shaderRecordSize, L"RayGenShaderTable"));
+        //ShaderTable rayGenShaderTable(device, numShaderRecords, shaderRecordSize, L"RayGenShaderTable");
+        m_actualRayGenShaderTable->push_back(
+            ShaderRecord(m_rayGenShaderIdentifier, m_shaderIdentifierSize, &rootArguments, sizeof(rootArguments)));
+        m_rayGenShaderTable = m_actualRayGenShaderTable->GetResource();
     }
 
     // Miss shader table
     {
         UINT numShaderRecords = 1;
-        UINT shaderRecordSize = shaderIdentifierSize;
+        UINT shaderRecordSize = m_shaderIdentifierSize;
         ShaderTable missShaderTable(device, numShaderRecords, shaderRecordSize, L"MissShaderTable");
-        missShaderTable.push_back(ShaderRecord(missShaderIdentifier, shaderIdentifierSize));
+        missShaderTable.push_back(ShaderRecord(missShaderIdentifier, m_shaderIdentifierSize));
         m_missShaderTable = missShaderTable.GetResource();
     }
 
     // Hit group shader table
     {
         UINT numShaderRecords = 1;
-        UINT shaderRecordSize = shaderIdentifierSize;
+        UINT shaderRecordSize = m_shaderIdentifierSize;
         ShaderTable hitGroupShaderTable(device, numShaderRecords, shaderRecordSize, L"HitGroupShaderTable");
-        hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, shaderIdentifierSize));
+        hitGroupShaderTable.push_back(ShaderRecord(hitGroupShaderIdentifier, m_shaderIdentifierSize));
         m_hitGroupShaderTable = hitGroupShaderTable.GetResource();
     }
 }
@@ -455,6 +497,16 @@ void D3D12RaytracingHelloWorld::OnUpdate()
 {
     m_timer.Tick();
     CalculateFrameStats();
+
+    float timeInMilli = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                               std::chrono::high_resolution_clock::now().time_since_epoch())
+                                               .count());
+    m_rayGenCB.timeNow = timeInMilli;
+    InitCamera();
+    //m_rayGenCB.origin = XMFLOAT3{ std::sin(timeInMilli * .001f)*3.f, 0.f, 0.f };
+    InitRayGenTable();
+ /*   ReleaseWindowSizeDependentResources();
+    CreateWindowSizeDependentResources();*/
 }
 
 void D3D12RaytracingHelloWorld::DoRaytracing()
@@ -493,6 +545,7 @@ void D3D12RaytracingHelloWorld::DoRaytracing()
 void D3D12RaytracingHelloWorld::UpdateForSizeChange(UINT width, UINT height)
 {
     DXSample::UpdateForSizeChange(width, height);
+
     float border = 0.1f;
     if (m_width <= m_height)
     {
@@ -511,6 +564,7 @@ void D3D12RaytracingHelloWorld::UpdateForSizeChange(UINT width, UINT height)
         };
 
     }
+    InitCamera();
 }
 
 // Copy the raytracing output to the backbuffer.
