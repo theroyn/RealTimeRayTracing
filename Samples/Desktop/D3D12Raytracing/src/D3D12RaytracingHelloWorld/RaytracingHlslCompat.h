@@ -23,6 +23,7 @@ using XMFLOAT4 = DirectX::XMFLOAT4;
 using XMFLOAT3 = DirectX::XMFLOAT3;
 using XMVECTOR = DirectX::XMVECTOR;
 #endif
+
 struct Viewport
 {
     float left;
@@ -30,7 +31,7 @@ struct Viewport
     float right;
     float bottom;
 };
-// origin, leftCorner, vpHorizontal, vpVertical
+
 struct RayGenConstantBuffer
 {
     Viewport viewport;
@@ -47,8 +48,6 @@ struct RayGenConstantBuffer
     float pad2;
 
     XMFLOAT3 vpVertical;
-    //  float pad3;
-    // XMFLOAT3 padding;
     float pad3[9];
 };
 
@@ -57,9 +56,5 @@ struct Vertex
     XMFLOAT3 position;
     XMFLOAT3 normal;
 };
-
-#ifndef HLSL
-//#pragma pack(16)
-#endif
 
 #endif // RAYTRACINGHLSLCOMPAT_H
