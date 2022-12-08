@@ -11,6 +11,6 @@ public:
     std::vector<Index> m_indices;
     std::vector<Vertex> m_vertices;
 
-    Model();
+    Model(const std::string& path);
 
 };

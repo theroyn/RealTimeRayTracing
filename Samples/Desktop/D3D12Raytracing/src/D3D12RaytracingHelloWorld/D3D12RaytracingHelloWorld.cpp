@@ -66,7 +66,11 @@ void D3D12RaytracingHelloWorld::InitCamera()
 
 void D3D12RaytracingHelloWorld::OnInit()
 {
-    m_models.push_back(Model{});
+    size_t sphereIdx = m_scene.LoadModel("SphereRad1.obj");
+    DirectX::XMMATRIX mat = DirectX::XMMatrixIdentity();
+    m_scene.AddInstance(sphereIdx, mat);
+    mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, 0.f);
+    m_scene.AddInstance(sphereIdx, mat);
     m_deviceResources = std::make_unique<DeviceResources>(
         DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, FrameCount, D3D_FEATURE_LEVEL_11_0,
         // Sample shows handling of use cases with tearing support, which is OS dependent and has been supported since
@@ -339,23 +343,16 @@ UINT D3D12RaytracingHelloWorld::CreateBufferSRV(D3DBuffer* buffer, UINT numEleme
 void D3D12RaytracingHelloWorld::BuildGeometry()
 {
     auto device = m_deviceResources->GetD3DDevice();
-    // Index indices[] = { 0, 1, 2 };
 
-    float depthValue = -1.0;
-    float offset = 0.7f;
-    // Vertex vertices[] = {
-    //    // The sample raytraces in screen space coordinates.
-    //    // Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
-    //    // Define the vertices in counter clockwise order ~ clockwise in left handed.
-    //    { 0, -offset, depthValue },
-    //    { offset, offset, depthValue },
-    //    { -offset, offset, depthValue },
-    //};
-    Vertex* vertices = m_models[0].m_vertices.data();
-    UINT verticesCount = static_cast<UINT>(m_models[0].m_vertices.size());
+    std::vector<Vertex> verticesData;
+    std::vector<Index> indicesData;
+    m_scene.GetModelData(0, verticesData, indicesData);
+
+    Vertex* vertices = verticesData.data();
+    UINT verticesCount = static_cast<UINT>(verticesData.size());
     size_t verticesSizeBytes = sizeof(vertices[0]) * verticesCount;
-    Index* indices = m_models[0].m_indices.data();
-    UINT indicesCount = static_cast<UINT>(m_models[0].m_indices.size());
+    Index* indices = indicesData.data();
+    UINT indicesCount = static_cast<UINT>(indicesData.size());
     size_t indicesSizeBytes = sizeof(indices[0]) * indicesCount;
 
     AllocateUploadBuffer(device, indices, indicesSizeBytes, &m_indexBuffer.resource);
@@ -395,14 +392,12 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
     // optimizations. Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is
     // present or not.
     geometryDesc.Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-    static constexpr UINT NUM_DESCS = 2;
     // Get required sizes for an acceleration structure.
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags =
         D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
     topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
     topLevelInputs.Flags = buildFlags;
-    topLevelInputs.NumDescs = NUM_DESCS;
     topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
 
     D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
@@ -446,27 +441,12 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
 
     // Create an instance desc for the bottom-level acceleration structure.
     ComPtr<ID3D12Resource> instanceDescsResource;
-    {
-        std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
-        instanceDescs.resize(NUM_DESCS);
-        {
-            D3D12_RAYTRACING_INSTANCE_DESC& instanceDesc = instanceDescs[0];
-            instanceDesc = {};
-            instanceDesc.InstanceMask = 1;
-            instanceDesc.AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-            instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = 1;
-        }
-        {
-            D3D12_RAYTRACING_INSTANCE_DESC& instanceDesc = instanceDescs[1];
-            instanceDesc = {};
-            instanceDesc.InstanceMask = 1;
-            instanceDesc.AccelerationStructure = m_bottomLevelAccelerationStructure->GetGPUVirtualAddress();
-            instanceDesc.Transform[0][0] = instanceDesc.Transform[1][1] = instanceDesc.Transform[2][2] = .5f;
-            instanceDesc.Transform[0][3] = 2.f;
-        }
-        UINT64 bufferSize = static_cast<UINT64>(instanceDescs.size() * sizeof(instanceDescs[0]));
-        AllocateUploadBuffer(device, instanceDescs.data(), bufferSize, &instanceDescsResource, L"InstanceDescs");
-    }
+
+    std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDescs;
+    m_scene.GetInstances(m_bottomLevelAccelerationStructure->GetGPUVirtualAddress(), instanceDescs);
+
+    UINT64 bufferSize = static_cast<UINT64>(instanceDescs.size() * sizeof(instanceDescs[0]));
+    AllocateUploadBuffer(device, instanceDescs.data(), bufferSize, &instanceDescsResource, L"InstanceDescs");
 
     // Bottom Level Acceleration Structure desc
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC bottomLevelBuildDesc = {};
@@ -480,6 +460,7 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
     D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelBuildDesc = {};
     {
         topLevelInputs.InstanceDescs = instanceDescsResource->GetGPUVirtualAddress();
+        topLevelInputs.NumDescs = (UINT)instanceDescs.size();
         topLevelBuildDesc.Inputs = topLevelInputs;
         topLevelBuildDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
         topLevelBuildDesc.ScratchAccelerationStructureData = scratchResource->GetGPUVirtualAddress();

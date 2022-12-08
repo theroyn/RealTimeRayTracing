@@ -16,6 +16,7 @@
 #include "RaytracingHlslCompat.h"
 #include "StepTimer.h"
 #include "Model.h"
+#include "Scene.h"
 
 namespace GlobalRootSignatureParams
 {
@@ -111,7 +112,7 @@ private:
     void InitCamera();
     // Application state
     StepTimer m_timer;
-    std::vector<Model> m_models;
+    Scene m_scene;
 
     void RecreateD3D();
     void DoRaytracing();
