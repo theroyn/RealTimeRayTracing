@@ -860,7 +860,10 @@ void D3D12RaytracingHelloWorld::OnKeyUp(UINT8 key)
 
 void D3D12RaytracingHelloWorld::InitializeScene()
 {
+    //size_t sphereIdx = m_scene.LoadModel("skull_obj/Skull.obj");
     size_t sphereIdx = m_scene.LoadModel("SphereRad1.obj");
+    //  size_t sphereIdx = m_scene.LoadModel("knight/knight.obj");
+    //size_t sphereIdx = m_scene.LoadModel("backpack/backpack.obj");
     DirectX::XMMATRIX mat = DirectX::XMMatrixIdentity();
     m_scene.AddInstance(sphereIdx, mat);
     mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, 0.f);

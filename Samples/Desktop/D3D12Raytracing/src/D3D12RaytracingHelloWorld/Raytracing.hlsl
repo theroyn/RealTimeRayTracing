@@ -38,7 +38,7 @@ struct RayPayload
     float2 lerpValues = (float2)DispatchRaysIndex() / dims;
 
     float3 currentPixel = g_rayGenCB.leftCorner.xyz + lerpValues.x * g_rayGenCB.vpHorizontal.xyz +
-                          lerpValues.y * g_rayGenCB.vpVertical.xyz;
+                          (1.f - lerpValues.y) * g_rayGenCB.vpVertical.xyz;
 
     // Trace the ray.
     // Set the ray's extents.

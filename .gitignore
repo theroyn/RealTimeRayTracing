@@ -20,3 +20,8 @@
 
 *.vcxproj.user
 *.opendb
+
+backpack/
+knight/
+skull/
+skull_obj/
