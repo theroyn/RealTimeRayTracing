@@ -109,7 +109,8 @@ private:
     void* m_rayGenShaderIdentifier;
     UINT m_shaderIdentifierSize;
     void InitRayGenTable();
-    void InitCamera();
+    void UpdateCamera();
+    void InitializeCamera();
     // Application state
     StepTimer m_timer;
     Scene m_scene;
@@ -136,4 +137,5 @@ private:
     void CalculateFrameStats();
     UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);
     UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
+    void InitializeScene();
 };

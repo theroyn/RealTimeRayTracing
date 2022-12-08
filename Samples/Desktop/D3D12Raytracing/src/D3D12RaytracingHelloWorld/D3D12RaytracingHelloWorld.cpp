@@ -27,27 +27,26 @@ D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, st
     : DXSample(width, height, name), m_raytracingOutputResourceUAVDescriptorHeapIndex(UINT_MAX)
 {
     m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
+
+    InitializeCamera();
+    UpdateForSizeChange(width, height);
+}
+
+void D3D12RaytracingHelloWorld::InitializeCamera()
+{
     XMVECTOR lookfrom{ std::sin(m_rayGenCB.timeNow * .01f), 0.f, 1.f, 1.f };
     XMVECTOR lookat{ 0.f, 0.f, -1.f, 1.f };
     XMVECTOR vup{ 0., 1., 0. };
     m_cam = std::make_shared<Camera>(lookfrom, lookat, vup);
-    InitCamera();
-    UpdateForSizeChange(width, height);
 }
 
-void D3D12RaytracingHelloWorld::InitCamera()
+void D3D12RaytracingHelloWorld::UpdateCamera()
 {
     using namespace DirectX;
-    // m_rayGenCB.origin = XMFLOAT3{ 0.f, 0.f, 1.f };
-    // XMVECTOR lookfrom{ 0.f, 0.f, 1.f };
     XMVECTOR lookfrom = m_cam->GetLookFrom();
     XMVECTOR forward = m_cam->GetForward();
     XMVECTOR up = m_cam->GetUp();
     XMVECTOR right = m_cam->GetRight();
-    // XMVECTOR forward = XMVector3Normalize(lookat - lookfrom);
-
-    // XMVECTOR right = XMVector3Normalize(XMVector3Cross(forward, vup));
-    // XMVECTOR up = XMVector3Normalize(XMVector3Cross(right, forward));
 
     float aspectRatio = (float)GetWidth() / (float)GetHeight();
     float vpHeight = 2.f;
@@ -57,7 +56,7 @@ void D3D12RaytracingHelloWorld::InitCamera()
     XMVECTOR vpVertical = vpHeight * up;
 
     XMVECTOR leftCorner = lookfrom + 1.f * forward - 0.5f * vpHorizontal - 0.5 * vpVertical;
-    int kaki = sizeof(m_rayGenCB);
+
     XMStoreFloat3(&m_rayGenCB.origin, lookfrom);
     XMStoreFloat3(&m_rayGenCB.leftCorner, leftCorner);
     XMStoreFloat3(&m_rayGenCB.vpHorizontal, vpHorizontal);
@@ -66,11 +65,8 @@ void D3D12RaytracingHelloWorld::InitCamera()
 
 void D3D12RaytracingHelloWorld::OnInit()
 {
-    size_t sphereIdx = m_scene.LoadModel("SphereRad1.obj");
-    DirectX::XMMATRIX mat = DirectX::XMMatrixIdentity();
-    m_scene.AddInstance(sphereIdx, mat);
-    mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, 0.f);
-    m_scene.AddInstance(sphereIdx, mat);
+    InitializeScene();
+
     m_deviceResources = std::make_unique<DeviceResources>(
         DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, FrameCount, D3D_FEATURE_LEVEL_11_0,
         // Sample shows handling of use cases with tearing support, which is OS dependent and has been supported since
@@ -568,7 +564,7 @@ void D3D12RaytracingHelloWorld::OnUpdate()
                                                std::chrono::high_resolution_clock::now().time_since_epoch())
                                                .count());
     m_rayGenCB.timeNow = timeInMilli;
-    InitCamera();
+    UpdateCamera();
     // m_cam->RotateRight(std::sin(timeInMilli * .0001f));
     // m_rayGenCB.origin = XMFLOAT3{ std::sin(timeInMilli * .001f)*3.f, 0.f, 0.f };
     InitRayGenTable();
@@ -626,7 +622,7 @@ void D3D12RaytracingHelloWorld::UpdateForSizeChange(UINT width, UINT height)
     {
         m_rayGenCB.stencil = { -1 + border / m_aspectRatio, -1 + border, 1 - border / m_aspectRatio, 1.0f - border };
     }
-    InitCamera();
+    UpdateCamera();
 }
 
 // Copy the raytracing output to the backbuffer.
@@ -860,4 +856,13 @@ void D3D12RaytracingHelloWorld::OnKeyUp(UINT8 key)
     default:
         break;
     }
+}
+
+void D3D12RaytracingHelloWorld::InitializeScene()
+{
+    size_t sphereIdx = m_scene.LoadModel("SphereRad1.obj");
+    DirectX::XMMATRIX mat = DirectX::XMMatrixIdentity();
+    m_scene.AddInstance(sphereIdx, mat);
+    mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, 0.f);
+    m_scene.AddInstance(sphereIdx, mat);
 }
