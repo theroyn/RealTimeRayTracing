@@ -15,6 +15,7 @@
 #include "DXSample.h"
 #include "RaytracingHlslCompat.h"
 #include "StepTimer.h"
+#include "Model.h"
 
 namespace GlobalRootSignatureParams
 {
@@ -22,6 +23,7 @@ enum Value
 {
     OutputViewSlot = 0,
     AccelerationStructureSlot,
+    VertexBuffers,
     Count
 };
 }
@@ -79,13 +81,8 @@ private:
     RayGenConstantBuffer m_rayGenCB;
 
     // Geometry
-    typedef UINT16 Index;
-    struct Vertex
-    {
-        float v1, v2, v3;
-    };
-    ComPtr<ID3D12Resource> m_indexBuffer;
-    ComPtr<ID3D12Resource> m_vertexBuffer;
+    D3DBuffer m_indexBuffer;
+    D3DBuffer m_vertexBuffer;
 
     // Acceleration structure
     ComPtr<ID3D12Resource> m_accelerationStructure;
@@ -114,6 +111,7 @@ private:
     void InitCamera();
     // Application state
     StepTimer m_timer;
+    std::vector<Model> m_models;
 
     void RecreateD3D();
     void DoRaytracing();
@@ -136,4 +134,5 @@ private:
     void CopyRaytracingOutputToBackbuffer();
     void CalculateFrameStats();
     UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);
+    UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
 };

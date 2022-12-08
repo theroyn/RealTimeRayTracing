@@ -15,7 +15,10 @@
 #include "HlslCompat.h"
 #else
 #include <DirectXMath.h>
-//#pragma pack(4)
+
+// Shader will use byte encoding to access vertex indices.
+using Index = UINT16;
+
 using XMFLOAT4 = DirectX::XMFLOAT4;
 using XMFLOAT3 = DirectX::XMFLOAT3;
 using XMVECTOR = DirectX::XMVECTOR;
@@ -48,6 +51,13 @@ struct RayGenConstantBuffer
     // XMFLOAT3 padding;
     float pad3[9];
 };
+
+struct Vertex
+{
+    XMFLOAT3 position;
+    XMFLOAT3 normal;
+};
+
 #ifndef HLSL
 //#pragma pack(16)
 #endif

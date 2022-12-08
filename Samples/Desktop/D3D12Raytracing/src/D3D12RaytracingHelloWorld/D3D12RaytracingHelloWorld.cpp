@@ -66,6 +66,7 @@ void D3D12RaytracingHelloWorld::InitCamera()
 
 void D3D12RaytracingHelloWorld::OnInit()
 {
+    m_models.push_back(Model{});
     m_deviceResources = std::make_unique<DeviceResources>(
         DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, FrameCount, D3D_FEATURE_LEVEL_11_0,
         // Sample shows handling of use cases with tearing support, which is OS dependent and has been supported since
@@ -135,9 +136,12 @@ void D3D12RaytracingHelloWorld::CreateRootSignatures()
     // This is a root signature that is shared across all raytracing shaders invoked during a DispatchRays() call.
     {
         CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
+        CD3DX12_DESCRIPTOR_RANGE SRVDescriptor;
         UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+        SRVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 2, 1);
         CD3DX12_ROOT_PARAMETER rootParameters[GlobalRootSignatureParams::Count];
         rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &UAVDescriptor);
+        rootParameters[GlobalRootSignatureParams::VertexBuffers].InitAsDescriptorTable(1, &SRVDescriptor);
         rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
         CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
         SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_raytracingGlobalRootSignature);
@@ -289,9 +293,10 @@ void D3D12RaytracingHelloWorld::CreateDescriptorHeap()
     auto device = m_deviceResources->GetD3DDevice();
 
     D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
-    // Allocate a heap for a single descriptor:
-    // 1 - raytracing output texture UAV
-    descriptorHeapDesc.NumDescriptors = 1;
+    // Allocate a heap for 3 descriptors:
+    // 2 - vertex and index buffer SRVs
+    // 1 - raytracing output texture SRV
+    descriptorHeapDesc.NumDescriptors = 3;
     descriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     descriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
     descriptorHeapDesc.NodeMask = 0;
@@ -301,25 +306,66 @@ void D3D12RaytracingHelloWorld::CreateDescriptorHeap()
     m_descriptorSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 }
 
+// Create a SRV for a buffer.
+UINT D3D12RaytracingHelloWorld::CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize)
+{
+    auto device = m_deviceResources->GetD3DDevice();
+
+    // SRV
+    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+    srvDesc.Buffer.NumElements = numElements;
+    if (elementSize == 0)
+    {
+        srvDesc.Format = DXGI_FORMAT_R32_TYPELESS;
+        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_RAW;
+        srvDesc.Buffer.StructureByteStride = 0;
+    }
+    else
+    {
+        srvDesc.Format = DXGI_FORMAT_UNKNOWN;
+        srvDesc.Buffer.Flags = D3D12_BUFFER_SRV_FLAG_NONE;
+        srvDesc.Buffer.StructureByteStride = elementSize;
+    }
+    UINT descriptorIndex = AllocateDescriptor(&buffer->cpuDescriptorHandle);
+    device->CreateShaderResourceView(buffer->resource.Get(), &srvDesc, buffer->cpuDescriptorHandle);
+    buffer->gpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(),
+                                                                descriptorIndex, m_descriptorSize);
+    return descriptorIndex;
+}
+
 // Build geometry used in the sample.
 void D3D12RaytracingHelloWorld::BuildGeometry()
 {
     auto device = m_deviceResources->GetD3DDevice();
-    Index indices[] = { 0, 1, 2 };
+    // Index indices[] = { 0, 1, 2 };
 
     float depthValue = -1.0;
     float offset = 0.7f;
-    Vertex vertices[] = {
-        // The sample raytraces in screen space coordinates.
-        // Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
-        // Define the vertices in counter clockwise order ~ clockwise in left handed.
-        { 0, -offset, depthValue },
-        { offset, offset, depthValue },
-        { -offset, offset, depthValue },
-    };
+    // Vertex vertices[] = {
+    //    // The sample raytraces in screen space coordinates.
+    //    // Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
+    //    // Define the vertices in counter clockwise order ~ clockwise in left handed.
+    //    { 0, -offset, depthValue },
+    //    { offset, offset, depthValue },
+    //    { -offset, offset, depthValue },
+    //};
+    Vertex* vertices = m_models[0].m_vertices.data();
+    UINT verticesCount = static_cast<UINT>(m_models[0].m_vertices.size());
+    size_t verticesSizeBytes = sizeof(vertices[0]) * verticesCount;
+    Index* indices = m_models[0].m_indices.data();
+    UINT indicesCount = static_cast<UINT>(m_models[0].m_indices.size());
+    size_t indicesSizeBytes = sizeof(indices[0]) * indicesCount;
 
-    AllocateUploadBuffer(device, vertices, sizeof(vertices), &m_vertexBuffer);
-    AllocateUploadBuffer(device, indices, sizeof(indices), &m_indexBuffer);
+    AllocateUploadBuffer(device, indices, indicesSizeBytes, &m_indexBuffer.resource);
+    AllocateUploadBuffer(device, vertices, verticesSizeBytes, &m_vertexBuffer.resource);
+
+    // Vertex buffer is passed to the shader along with index buffer as a descriptor range.
+    UINT descriptorIndexIB = CreateBufferSRV(&m_indexBuffer, static_cast<UINT>(indicesSizeBytes / 4), 0);
+    UINT descriptorIndexVB = CreateBufferSRV(&m_vertexBuffer, (UINT)verticesCount, sizeof(vertices[0]));
+    ThrowIfFalse(descriptorIndexVB == descriptorIndexIB + 1,
+                 L"Vertex Buffer descriptor index must follow that of Index Buffer descriptor index");
 }
 
 // Build acceleration structures needed for raytracing.
@@ -335,13 +381,13 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
 
     D3D12_RAYTRACING_GEOMETRY_DESC geometryDesc = {};
     geometryDesc.Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-    geometryDesc.Triangles.IndexBuffer = m_indexBuffer->GetGPUVirtualAddress();
-    geometryDesc.Triangles.IndexCount = static_cast<UINT>(m_indexBuffer->GetDesc().Width) / sizeof(Index);
+    geometryDesc.Triangles.IndexBuffer = m_indexBuffer.resource->GetGPUVirtualAddress();
+    geometryDesc.Triangles.IndexCount = static_cast<UINT>(m_indexBuffer.resource->GetDesc().Width) / sizeof(Index);
     geometryDesc.Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
     geometryDesc.Triangles.Transform3x4 = 0;
     geometryDesc.Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-    geometryDesc.Triangles.VertexCount = static_cast<UINT>(m_vertexBuffer->GetDesc().Width) / sizeof(Vertex);
-    geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer->GetGPUVirtualAddress();
+    geometryDesc.Triangles.VertexCount = static_cast<UINT>(m_vertexBuffer.resource->GetDesc().Width) / sizeof(Vertex);
+    geometryDesc.Triangles.VertexBuffer.StartAddress = m_vertexBuffer.resource->GetGPUVirtualAddress();
     geometryDesc.Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
 
     // Mark the geometry as opaque.
@@ -556,6 +602,8 @@ void D3D12RaytracingHelloWorld::DoRaytracing()
     // Bind the heaps, acceleration structure and dispatch rays.
     D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
     commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
+    commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::VertexBuffers,
+                                               m_indexBuffer.gpuDescriptorHandle);
     commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot,
                                                m_raytracingOutputResourceUAVGpuDescriptor);
     commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot,
@@ -635,8 +683,8 @@ void D3D12RaytracingHelloWorld::ReleaseDeviceDependentResources()
     m_descriptorHeap.Reset();
     m_descriptorsAllocated = 0;
     m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
-    m_indexBuffer.Reset();
-    m_vertexBuffer.Reset();
+    m_indexBuffer.resource.Reset();
+    m_vertexBuffer.resource.Reset();
 
     m_accelerationStructure.Reset();
     m_bottomLevelAccelerationStructure.Reset();
