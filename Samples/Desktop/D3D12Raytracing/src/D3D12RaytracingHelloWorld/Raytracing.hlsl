@@ -14,22 +14,22 @@
 
 #define HLSL
 #include "RaytracingHlslCompat.h"
+#include "RaytracingShaderHelper.hlsli"
 
 RaytracingAccelerationStructure Scene : register(t0, space0);
 RWTexture2D<float4> RenderTarget : register(u0);
 ConstantBuffer<RayGenConstantBuffer> g_rayGenCB : register(b0);
 
+// Triangle resources
+ByteAddressBuffer g_indices : register(t1, space0);
+StructuredBuffer<Vertex> g_vertices : register(t2, space0);
+
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
+
 struct RayPayload
 {
     float4 color;
 };
-
-bool IsInsideViewport(float2 p, Viewport viewport)
-{
-    return true;
-    return (p.x >= viewport.left && p.x <= viewport.right) && (p.y >= viewport.top && p.y <= viewport.bottom);
-}
 
 [shader("raygeneration")] void MyRaygenShader()
 {
@@ -60,9 +60,19 @@ bool IsInsideViewport(float2 p, Viewport viewport)
 
     [shader("closesthit")] void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
+    uint indexSizeInBytes = 2;
+    uint indicesPerTriangle = 3;
+    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+
+    // Load up three 16 bit indices for the triangle.
+    const uint3 indices = Load3x16BitIndices(baseIndex, g_indices);
+
+    // Retrieve corresponding vertex normals for the triangle vertices.
+    float3 triangleNormal = g_vertices[indices[0]].normal;
     float3 barycentrics =
         float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-    payload.color = float4(barycentrics, 1);
+    payload.color = float4(triangleNormal, 1);
 }
 
 [shader("miss")] void MyMissShader(inout RayPayload payload) { payload.color = float4(0, 0, 0, 1); }

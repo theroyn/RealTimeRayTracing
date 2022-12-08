@@ -9,8 +9,7 @@
 Model::Model()
 {
     Assimp::Importer importer;
-    m_scene = importer.ReadFile("SphereRad1.obj", aiProcess_Triangulate | /*aiProcess_ConvertToLeftHanded |*/
-                                                      aiProcess_ValidateDataStructure);
+    m_scene = importer.ReadFile("SphereRad1.obj", aiProcess_Triangulate | aiProcess_ValidateDataStructure);
 
     if (!m_scene || m_scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !m_scene->mRootNode || m_scene->mNumMeshes != 1)
     {
