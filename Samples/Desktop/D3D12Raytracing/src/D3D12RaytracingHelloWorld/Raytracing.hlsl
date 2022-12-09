@@ -23,6 +23,7 @@ ConstantBuffer<RayGenConstantBuffer> g_rayGenCB : register(b0);
 // Triangle resources
 ByteAddressBuffer g_indices : register(t1, space0);
 StructuredBuffer<Vertex> g_vertices : register(t2, space0);
+StructuredBuffer<PrimitiveMaterialBuffer> g_materials : register(t3);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
@@ -81,10 +82,15 @@ float3 GetNormal()
     float3 lightAmbience = float3(.05f, .05f, .05f);
     float3 lightSpecular = float3(.5f, .5f, .5f);
     float3 lightColor = float3(1.f, 1.f, 1.f);
-
+    uint instanceID = InstanceID();
     float objectShinines = 8.f;
-    float3 objectColor = float3(1.f, .2f, 0.f);
+    PrimitiveMaterialBuffer material = g_materials[instanceID];
+    float3 objectColor = material.albedo;
 
+    // assuming object is centered around the origin
+    float3 worldCenter = mul(float4(0.f,0.f,0.f,1.f), ObjectToWorld4x3()).xyz;
+    float3 worldPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+    float3 realNormal = normalize(worldPos - worldCenter);
     float3 outColor;
 
     // Retrieve corresponding vertex normals for the triangle vertices.
@@ -92,11 +98,10 @@ float3 GetNormal()
     float3 barycentrics =
         float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
     float3 currentNormal = barycentrics * triangleNormal;
-    float3 worldPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     float3 objectToLight = normalize(lightPos.xyz - worldPos);
 
-    float diffuse = max(0.f, dot(objectToLight, currentNormal));
-    float3 reflected = reflect(WorldRayDirection(), currentNormal);
+    float diffuse = max(0.f, dot(objectToLight, realNormal));
+    float3 reflected = reflect(WorldRayDirection(), realNormal);
     float specular = pow(objectShinines, max(0.f, (dot(reflected, objectToLight))));
 
     outColor = (lightAmbience + specular * lightSpecular + diffuse * lightDiffuse) * lightColor * objectColor;

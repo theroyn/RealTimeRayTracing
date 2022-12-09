@@ -57,4 +57,31 @@ struct Vertex
     XMFLOAT3 normal;
 };
 
+namespace MaterialType
+{
+enum Type
+{
+    Default,
+    Matte,  // Lambertian scattering
+    Mirror, // Specular reflector that isn't modified by the Fresnel equations.
+    AnalyticalCheckerboardTexture
+};
+}
+
+struct PrimitiveMaterialBuffer
+{
+    XMFLOAT3 Ks;
+    XMFLOAT3 Kr;
+    XMFLOAT3 Kt;
+    XMFLOAT3 albedo;
+    XMFLOAT3 opacity;
+    XMFLOAT3 eta;
+    float fuzz;
+    float refractionIndex;
+    BOOL hasDiffuseTexture;
+    BOOL hasNormalTexture;
+    BOOL hasPerVertexTangents;
+    MaterialType::Type type;
+};
+
 #endif // RAYTRACINGHLSLCOMPAT_H

@@ -8,13 +8,13 @@ size_t Scene::LoadModel(const std::string& path)
 {
     _models.emplace_back(path);
     size_t modelIdx = _models.size() - 1;
-    _instances.emplace(modelIdx, std::vector<DirectX::XMMATRIX>{});
+    _instances.emplace(modelIdx, std::vector<SceneInstance>{});
     return modelIdx;
 }
 
-void Scene::AddInstance(size_t modelIdx, const DirectX::XMMATRIX& transform)
+void Scene::AddInstance(size_t modelIdx, const DirectX::XMMATRIX& transform, unsigned int materialIndex)
 {
-    _instances.at(modelIdx).push_back(transform);
+    _instances.at(modelIdx).push_back(SceneInstance{ transform, materialIndex });
 }
 
 void Scene::GetInstances(D3D12_GPU_VIRTUAL_ADDRESS BLASAddress,
@@ -26,10 +26,12 @@ void Scene::GetInstances(D3D12_GPU_VIRTUAL_ADDRESS BLASAddress,
         auto& modelInstances = _instances.at(i);
         for (int j = 0; j < modelInstances.size(); ++j)
         {
-            DirectX::XMMATRIX& instanceTransform = modelInstances.at(j);
+            const SceneInstance& instance = modelInstances.at(j);
+            const DirectX::XMMATRIX& instanceTransform = instance.transform;
             XMMATRIX transposed = XMMatrixTranspose(instanceTransform);
             D3D12_RAYTRACING_INSTANCE_DESC instanceDesc = {};
             instanceDesc.InstanceMask = 1;
+            instanceDesc.InstanceID = instance.materialIndex;
             instanceDesc.AccelerationStructure = BLASAddress;
             for (int rowIdx = 0; rowIdx < 3; ++rowIdx)
             {

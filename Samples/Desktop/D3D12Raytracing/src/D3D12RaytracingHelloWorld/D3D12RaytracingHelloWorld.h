@@ -25,6 +25,8 @@ enum Value
     OutputViewSlot = 0,
     AccelerationStructureSlot,
     VertexBuffers,
+    MaterialBuffer,
+
     Count
 };
 }
@@ -114,6 +116,8 @@ private:
     // Application state
     StepTimer m_timer;
     Scene m_scene;
+    std::vector<PrimitiveMaterialBuffer> m_materials;
+    StructuredBuffer<PrimitiveMaterialBuffer> m_materialBuffer;
 
     void RecreateD3D();
     void DoRaytracing();
@@ -138,4 +142,5 @@ private:
     UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);
     UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
     void InitializeScene();
+    void InitializeMaterials();
 };

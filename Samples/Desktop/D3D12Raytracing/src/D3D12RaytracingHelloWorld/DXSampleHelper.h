@@ -345,4 +345,20 @@ public:
     {
         return m_resource->GetGPUVirtualAddress() + instanceIndex * InstanceSize();
     }
+    auto begin()
+    {
+        return m_staging.begin();
+    }
+    auto end()
+    {
+        return m_staging.end();
+    }
+    auto begin() const
+    {
+        return m_staging.begin();
+    }
+    auto end() const
+    {
+        return m_staging.end();
+    }
 };

@@ -107,6 +107,8 @@ void D3D12RaytracingHelloWorld::CreateDeviceDependentResources()
     // Build geometry to be used in the sample.
     BuildGeometry();
 
+    InitializeMaterials();
+
     // Build raytracing acceleration structures from the generated geometry.
     BuildAccelerationStructures();
 
@@ -143,6 +145,7 @@ void D3D12RaytracingHelloWorld::CreateRootSignatures()
         rootParameters[GlobalRootSignatureParams::OutputViewSlot].InitAsDescriptorTable(1, &UAVDescriptor);
         rootParameters[GlobalRootSignatureParams::VertexBuffers].InitAsDescriptorTable(1, &SRVDescriptor);
         rootParameters[GlobalRootSignatureParams::AccelerationStructureSlot].InitAsShaderResourceView(0);
+        rootParameters[GlobalRootSignatureParams::MaterialBuffer].InitAsShaderResourceView(3);
         CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
         SerializeAndCreateRaytracingRootSignature(globalRootSignatureDesc, &m_raytracingGlobalRootSignature);
     }
@@ -605,6 +608,8 @@ void D3D12RaytracingHelloWorld::DoRaytracing()
                                                m_raytracingOutputResourceUAVGpuDescriptor);
     commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot,
                                                   m_topLevelAccelerationStructure->GetGPUVirtualAddress());
+    commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::MaterialBuffer,
+                                                  m_materialBuffer.GpuVirtualAddress());
     DispatchRays(m_dxrCommandList.Get(), m_dxrStateObject.Get(), &dispatchDesc);
 }
 
@@ -860,13 +865,35 @@ void D3D12RaytracingHelloWorld::OnKeyUp(UINT8 key)
 
 void D3D12RaytracingHelloWorld::InitializeScene()
 {
-    //size_t sphereIdx = m_scene.LoadModel("skull_obj/Skull.obj");
+    // size_t sphereIdx = m_scene.LoadModel("skull_obj/Skull.obj");
     size_t sphereIdx = m_scene.LoadModel("sphere2/sphere.obj");
-    //size_t sphereIdx = m_scene.LoadModel("SphereRad1.obj");
+    // size_t sphereIdx = m_scene.LoadModel("SphereRad1.obj");
     //  size_t sphereIdx = m_scene.LoadModel("knight/knight.obj");
-    //size_t sphereIdx = m_scene.LoadModel("backpack/backpack.obj");
-    DirectX::XMMATRIX mat = DirectX::XMMatrixTranslation(-1.f, .5f, -1.f);
-    m_scene.AddInstance(sphereIdx, mat);
+    // size_t sphereIdx = m_scene.LoadModel("backpack/backpack.obj");
+
+    DirectX::XMMATRIX mat = DirectX::XMMatrixTranslation(-1.f, .5f, -1.f);    
+    // DUDU refactor material indices
+    m_scene.AddInstance(sphereIdx, mat, 0);
     mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, -1.f);
-    m_scene.AddInstance(sphereIdx, mat);
+    m_scene.AddInstance(sphereIdx, mat, 1);
+}
+
+void D3D12RaytracingHelloWorld::InitializeMaterials()
+{
+    // DUDU refactor
+    {
+        PrimitiveMaterialBuffer material = {};
+        material.albedo = XMFLOAT3{ 1.f, .2f, .3f };
+        m_materials.push_back(material);
+    }
+    {
+        PrimitiveMaterialBuffer material = {};
+        material.albedo = XMFLOAT3{ .2f, .2f, .9f };
+        m_materials.push_back(material);
+    }
+
+    auto device = m_deviceResources->GetD3DDevice();
+    m_materialBuffer.Create(device, static_cast<UINT>(m_materials.size()), 1, L"Structured buffer: materials");
+    copy(m_materials.begin(), m_materials.end(), m_materialBuffer.begin());
+    m_materialBuffer.CopyStagingToGpu();
 }

@@ -18,7 +18,7 @@ Model::Model(const std::string& path)
         throw std::runtime_error(msg);
     }
 
-    for (int meshIdx = 0; meshIdx < m_scene->mNumMeshes; ++meshIdx)
+    for (unsigned int meshIdx = 0; meshIdx < m_scene->mNumMeshes; ++meshIdx)
     {
         aiMesh* mesh = m_scene->mMeshes[meshIdx];
         for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
