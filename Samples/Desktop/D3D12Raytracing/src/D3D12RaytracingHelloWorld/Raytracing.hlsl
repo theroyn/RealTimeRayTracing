@@ -31,6 +31,22 @@ struct RayPayload
     float4 color;
 };
 
+float3 GetNormal()
+{
+    uint indexSizeInBytes = 2;
+    uint indicesPerTriangle = 3;
+    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
+    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+
+    // Load up three 16 bit indices for the triangle.
+    const uint3 indices = Load3x16BitIndices(baseIndex, g_indices);
+
+    // Retrieve corresponding vertex normals for the triangle vertices.
+    float3 triangleNormal = g_vertices[indices[0]].normal;
+
+    return triangleNormal;
+}
+
 [shader("raygeneration")] void MyRaygenShader()
 {
     float timeVal = sin(g_rayGenCB.timeNow * .01f) * .5f + .5f;
@@ -60,19 +76,31 @@ struct RayPayload
 
     [shader("closesthit")] void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-    uint indexSizeInBytes = 2;
-    uint indicesPerTriangle = 3;
-    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
-    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
+    float4 lightPos = float4(4.f, 10.f, -1.f, 1.f);
+    float3 lightDiffuse = float3(.4f, .4f, .4f);
+    float3 lightAmbience = float3(.05f, .05f, .05f);
+    float3 lightSpecular = float3(.5f, .5f, .5f);
+    float3 lightColor = float3(1.f, 1.f, 1.f);
 
-    // Load up three 16 bit indices for the triangle.
-    const uint3 indices = Load3x16BitIndices(baseIndex, g_indices);
+    float objectShinines = 8.f;
+    float3 objectColor = float3(1.f, .2f, 0.f);
+
+    float3 outColor;
 
     // Retrieve corresponding vertex normals for the triangle vertices.
-    float3 triangleNormal = g_vertices[indices[0]].normal;
+    float3 triangleNormal = GetNormal();
     float3 barycentrics =
         float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-    payload.color = float4(triangleNormal, 1);
+    float3 currentNormal = barycentrics * triangleNormal;
+    float3 worldPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+    float3 objectToLight = normalize(lightPos.xyz - worldPos);
+
+    float diffuse = max(0.f, dot(objectToLight, currentNormal));
+    float3 reflected = reflect(WorldRayDirection(), currentNormal);
+    float specular = pow(objectShinines, max(0.f, (dot(reflected, objectToLight))));
+
+    outColor = (lightAmbience + specular * lightSpecular + diffuse * lightDiffuse) * lightColor * objectColor;
+    payload.color = float4(outColor, 1);
 }
 
 [shader("miss")] void MyMissShader(inout RayPayload payload) { payload.color = float4(0, 0, 0, 1); }
