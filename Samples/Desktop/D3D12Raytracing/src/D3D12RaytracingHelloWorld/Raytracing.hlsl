@@ -52,27 +52,36 @@ float3 GetNormal()
 {
     float timeVal = sin(g_rayGenCB.timeNow * .01f) * .5f + .5f;
     float2 dims = DispatchRaysDimensions().xy;
-    float2 lerpValues = (float2)DispatchRaysIndex() / dims;
+    int samples_per_pixel = 100;
+    float3 color = float3(0.f, 0.f, 0.f);
+    for (int s = 0; s < samples_per_pixel; ++s)
+    {
+        RayPayload payload = { float4(0, 0, 0, 0) };
+        float2 uv = (float2)DispatchRaysIndex() / dims;
+        float2 lerpValues = ((float2)DispatchRaysIndex() + rand2(uv, timeVal)) / dims;
 
-    float3 currentPixel = g_rayGenCB.leftCorner.xyz + lerpValues.x * g_rayGenCB.vpHorizontal.xyz +
-                          (1.f - lerpValues.y) * g_rayGenCB.vpVertical.xyz;
+        float3 currentPixel = g_rayGenCB.leftCorner.xyz + lerpValues.x * g_rayGenCB.vpHorizontal +
+                              (1.f - lerpValues.y) * g_rayGenCB.vpVertical;
 
-    // Trace the ray.
-    // Set the ray's extents.
-    RayDesc ray;
-    ray.Origin = g_rayGenCB.origin;
-    ray.Direction = normalize(currentPixel - g_rayGenCB.origin);
-    // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
-    // TMin should be kept small to prevent missing geometry at close contact areas.
-    ray.TMin = 0.001;
-    ray.TMax = 10000.0;
+        // Trace the ray.
+        // Set the ray's extents.
+        RayDesc ray;
+        ray.Origin = g_rayGenCB.origin;
+        ray.Direction = normalize(currentPixel - g_rayGenCB.origin);
+        // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
+        // TMin should be kept small to prevent missing geometry at close contact areas.
+        ray.TMin = 0.001;
+        ray.TMax = 10000.0;
 
-    RayPayload payload = { float4(0, 0, 0, 0) };
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
 
-    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, payload);
+        color += payload.color.xyz;
+    }
+    float scale = scale = 1.0 / samples_per_pixel;
+    color *= scale;
 
     // Write the raytraced color to the output texture.
-    RenderTarget[DispatchRaysIndex().xy] = payload.color;
+    RenderTarget[DispatchRaysIndex().xy] = float4(color, 1.f);
 }
 
     [shader("closesthit")] void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
@@ -88,7 +97,7 @@ float3 GetNormal()
     float3 objectColor = material.albedo;
 
     // assuming object is centered around the origin
-    float3 worldCenter = mul(float4(0.f,0.f,0.f,1.f), ObjectToWorld4x3()).xyz;
+    float3 worldCenter = mul(float4(0.f, 0.f, 0.f, 1.f), ObjectToWorld4x3()).xyz;
     float3 worldPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
     float3 realNormal = normalize(worldPos - worldCenter);
     float3 outColor;
@@ -108,6 +117,12 @@ float3 GetNormal()
     payload.color = float4(outColor, 1);
 }
 
-[shader("miss")] void MyMissShader(inout RayPayload payload) { payload.color = float4(0, 0, 0, 1); }
+[shader("miss")] void MyMissShader(inout RayPayload payload)
+{
+    float3 unit_direction = WorldRayDirection();
+    float t = 0.5 * (unit_direction.y + 1.0);
+    float3 color = (1.f - t) * float3(1.f, 1.f, 1.f) + t * float3(.5f, .7f, 1.f);
+    payload.color = float4(color, 1.f);
+}
 
 #endif // RAYTRACING_HLSL

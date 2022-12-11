@@ -74,6 +74,15 @@ float random(float2 p)
 }
 
 // Input variables: uv - [0, 1). timeVal - [0, 1] (sine of current time).
+float2 rand2(float2 uv, float timeVal)
+{
+    float2 ins = (uv + timeVal) * .5f; // [0..1]
+    float2 ins2 = 1 - ins * ins;       // [0..1]
+
+    return float2(random(ins), random(ins2));
+}
+
+// Input variables: uv - [0, 1). timeVal - [0, 1] (sine of current time).
 float3 rand3(float2 uv, float timeVal)
 {
     float2 ins = (uv + timeVal) * .5f; // [0..1]

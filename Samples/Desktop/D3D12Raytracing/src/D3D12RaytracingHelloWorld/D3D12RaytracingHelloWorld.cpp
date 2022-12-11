@@ -34,7 +34,7 @@ D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, st
 
 void D3D12RaytracingHelloWorld::InitializeCamera()
 {
-    XMVECTOR lookfrom{ std::sin(m_rayGenCB.timeNow * .01f), 0.f, 1.f, 1.f };
+    XMVECTOR lookfrom{ 0.f, 0.f, 1.f, 1.f };
     XMVECTOR lookat{ 0.f, 0.f, -1.f, 1.f };
     XMVECTOR vup{ 0., 1., 0. };
     m_cam = std::make_shared<Camera>(lookfrom, lookat, vup);
@@ -51,11 +51,12 @@ void D3D12RaytracingHelloWorld::UpdateCamera()
     float aspectRatio = (float)GetWidth() / (float)GetHeight();
     float vpHeight = 2.f;
     float vpWidth = aspectRatio * vpHeight;
+    float focalLength = 1.f;
 
     XMVECTOR vpHorizontal = vpWidth * right;
     XMVECTOR vpVertical = vpHeight * up;
 
-    XMVECTOR leftCorner = lookfrom + 1.f * forward - 0.5f * vpHorizontal - 0.5 * vpVertical;
+    XMVECTOR leftCorner = lookfrom + focalLength * forward - 0.5f * vpHorizontal - 0.5 * vpVertical;
 
     XMStoreFloat3(&m_rayGenCB.origin, lookfrom);
     XMStoreFloat3(&m_rayGenCB.leftCorner, leftCorner);
@@ -862,6 +863,11 @@ void D3D12RaytracingHelloWorld::OnKeyUp(UINT8 key)
         break;
     }
 }
+DirectX::XMMATRIX GetSphereTrans(XMFLOAT3 pos, float rad)
+{
+    DirectX::XMMATRIX mat = DirectX::XMMatrixScaling(rad, rad, rad) * DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
+    return mat;
+}
 
 void D3D12RaytracingHelloWorld::InitializeScene()
 {
@@ -871,11 +877,13 @@ void D3D12RaytracingHelloWorld::InitializeScene()
     //  size_t sphereIdx = m_scene.LoadModel("knight/knight.obj");
     // size_t sphereIdx = m_scene.LoadModel("backpack/backpack.obj");
 
-    DirectX::XMMATRIX mat = DirectX::XMMatrixTranslation(-1.f, .5f, -1.f);    
+    // DirectX::XMMATRIX mat = DirectX::XMMatrixTranslation(0.f, 0.f, -1.f);
+    DirectX::XMMATRIX mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
     // DUDU refactor material indices
     m_scene.AddInstance(sphereIdx, mat, 0);
-    mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, -1.f);
-    m_scene.AddInstance(sphereIdx, mat, 1);
+    mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
+    // mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, -1.f);
+    m_scene.AddInstance(sphereIdx, mat, 0);
 }
 
 void D3D12RaytracingHelloWorld::InitializeMaterials()
