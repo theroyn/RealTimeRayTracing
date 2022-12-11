@@ -89,8 +89,13 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
     float2 uv = (float2)DispatchRaysIndex() / dims;
 
-    // float3 target = p + randomInHemisphere(normal, DispatchRaysIndex().xy, fract(payload.timeVal));
-    float3 target = p + normal + randomInUnitVector(DispatchRaysIndex().xy, fract(payload.timeVal));
+    // float3 target = randomInHemisphere(normal, DispatchRaysIndex().xy, fract(payload.timeVal));
+    // Catch degenerate scatter direction
+    float3 target = normal + randomInUnitVector(DispatchRaysIndex().xy, fract(payload.timeVal));
+    if (nearZero(target))
+    {
+        target = normal;
+    }
 
     RayPayload currentPayload = payload;
     currentPayload.color = float4(0.f, 0.f, 0.f, 0.f);
@@ -98,7 +103,7 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
     RayDesc ray;
 
     ray.Origin = p;
-    ray.Direction = normalize(target - p);
+    ray.Direction = normalize(target);
     ray.TMin = 0.0001;
     ray.TMax = 10000.0;
 

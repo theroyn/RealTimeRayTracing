@@ -52,7 +52,6 @@ static uint3 Load3x16BitIndices(uint offsetBytes, ByteAddressBuffer Indices)
     return indices;
 }
 
-
 //////// DUDU REMOVE ALL THE DEAD RANDOM CODE WHEN SATISFIED WITH CURRENT CODE
 #if 0
 
@@ -208,4 +207,13 @@ float3 randomInHemisphere(const float3 normal, float2 uv, float timeVal)
     else
         return -inUnitSphere;
 }
+
+#define EPS 1e-8
+
+bool nearZero(float3 e)
+{
+    // Return true if the vector is close to zero in all dimensions.
+    return (abs(e[0]) < EPS) && (abs(e[1]) < EPS) && (abs(e[2]) < EPS);
+}
+
 #endif // RAYTRACINGSHADERHELPER_H
