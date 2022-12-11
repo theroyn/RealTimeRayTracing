@@ -18,6 +18,8 @@
 #include "Model.h"
 #include "Scene.h"
 
+#include <fstream>
+
 namespace GlobalRootSignatureParams
 {
 enum Value
@@ -58,10 +60,7 @@ public:
     virtual void OnMouseMove(UINT x, UINT y) override;
     virtual void OnKeyDown(UINT8 key) override;
     virtual void OnKeyUp(UINT8 key) override;
-    virtual IDXGISwapChain* GetSwapchain() override
-    {
-        return m_deviceResources->GetSwapChain();
-    }
+    virtual IDXGISwapChain* GetSwapchain() override;
 
 private:
     static const UINT FrameCount = 3;
@@ -118,6 +117,7 @@ private:
     Scene m_scene;
     std::vector<PrimitiveMaterialBuffer> m_materials;
     StructuredBuffer<PrimitiveMaterialBuffer> m_materialBuffer;
+    std::ofstream m_logFd;
 
     void RecreateD3D();
     void DoRaytracing();
@@ -143,4 +143,5 @@ private:
     UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
     void InitializeScene();
     void InitializeMaterials();
+    void Log(const std::string& msg, const std::string& func, int line);
 };

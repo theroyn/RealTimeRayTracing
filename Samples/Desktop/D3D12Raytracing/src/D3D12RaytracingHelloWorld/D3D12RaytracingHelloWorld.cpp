@@ -15,7 +15,8 @@
 #include "DirectXRaytracingHelper.h"
 
 #include <chrono>
-using namespace std;
+#include <ctime>
+
 using namespace DX;
 
 const wchar_t* D3D12RaytracingHelloWorld::c_hitGroupName = L"MyHitGroup";
@@ -23,18 +24,50 @@ const wchar_t* D3D12RaytracingHelloWorld::c_raygenShaderName = L"MyRaygenShader"
 const wchar_t* D3D12RaytracingHelloWorld::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* D3D12RaytracingHelloWorld::c_missShaderName = L"MyMissShader";
 
+void D3D12RaytracingHelloWorld::Log(const std::string& msg, const std::string& func, int line)
+{
+    std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    struct tm tmBuf;
+    char buf[26] = { 0 };
+    localtime_s(&tmBuf, &now);
+    asctime_s(buf, sizeof buf, &tmBuf);
+
+    std::string tmpTimeStr = buf;
+    std::string timeStr = tmpTimeStr.substr(0, tmpTimeStr.length() - 1);
+    m_logFd << timeStr << ":" << func << ":" << line << " - " << msg << std::endl;
+}
+
+#define LOG(msg)                                                                                                       \
+    Log((msg), __FUNCTION__, __LINE__);                                                                                \
+    throw std::runtime_error(msg);
+
+#define LOG_NOTHROW(msg) Log((msg), __FUNCTION__, __LINE__);
+
 D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, std::wstring name)
     : DXSample(width, height, name), m_raytracingOutputResourceUAVDescriptorHeapIndex(UINT_MAX)
 {
-    m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
+    try
+    {
+        m_logFd.open("errorLog.txt", std::ios::app | std::ios::out);
+        if (!m_logFd)
+        {
+            throw std::runtime_error("couldn't open log");
+        }
+        m_logFd << std::endl;
+        m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
 
-    InitializeCamera();
-    UpdateForSizeChange(width, height);
+        InitializeCamera();
+        UpdateForSizeChange(width, height);
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 void D3D12RaytracingHelloWorld::InitializeCamera()
 {
-    XMVECTOR lookfrom{ 0.f, 0.f, 1.f, 1.f };
+    XMVECTOR lookfrom{ 0.f, 0.f, 0.f, 1.f };
     XMVECTOR lookat{ 0.f, 0.f, -1.f, 1.f };
     XMVECTOR vup{ 0., 1., 0. };
     m_cam = std::make_shared<Camera>(lookfrom, lookat, vup);
@@ -66,25 +99,33 @@ void D3D12RaytracingHelloWorld::UpdateCamera()
 
 void D3D12RaytracingHelloWorld::OnInit()
 {
-    InitializeScene();
+    try
+    {
+        InitializeScene();
 
-    m_deviceResources = std::make_unique<DeviceResources>(
-        DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, FrameCount, D3D_FEATURE_LEVEL_11_0,
-        // Sample shows handling of use cases with tearing support, which is OS dependent and has been supported since
-        // TH2. Since the sample requires build 1809 (RS5) or higher, we don't need to handle non-tearing cases.
-        DeviceResources::c_RequireTearingSupport, m_adapterIDoverride);
-    m_deviceResources->RegisterDeviceNotify(this);
-    m_deviceResources->SetWindow(Win32Application::GetHwnd(), m_width, m_height);
-    m_deviceResources->InitializeDXGIAdapter();
+        m_deviceResources = std::make_unique<DeviceResources>(
+            DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_UNKNOWN, FrameCount, D3D_FEATURE_LEVEL_11_0,
+            // Sample shows handling of use cases with tearing support, which is OS dependent and has been supported
+            // since TH2. Since the sample requires build 1809 (RS5) or higher, we don't need to handle non-tearing
+            // cases.
+            DeviceResources::c_RequireTearingSupport, m_adapterIDoverride);
+        m_deviceResources->RegisterDeviceNotify(this);
+        m_deviceResources->SetWindow(Win32Application::GetHwnd(), m_width, m_height);
+        m_deviceResources->InitializeDXGIAdapter();
 
-    ThrowIfFalse(IsDirectXRaytracingSupported(m_deviceResources->GetAdapter()),
-                 L"ERROR: DirectX Raytracing is not supported by your OS, GPU and/or driver.\n\n");
+        ThrowIfFalse(IsDirectXRaytracingSupported(m_deviceResources->GetAdapter()),
+                     L"ERROR: DirectX Raytracing is not supported by your OS, GPU and/or driver.\n\n");
 
-    m_deviceResources->CreateDeviceResources();
-    m_deviceResources->CreateWindowSizeDependentResources();
+        m_deviceResources->CreateDeviceResources();
+        m_deviceResources->CreateWindowSizeDependentResources();
 
-    CreateDeviceDependentResources();
-    CreateWindowSizeDependentResources();
+        CreateDeviceDependentResources();
+        CreateWindowSizeDependentResources();
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 // Create resources that depend on the device.
@@ -235,7 +276,7 @@ void D3D12RaytracingHelloWorld::CreateRaytracingPipelineStateObject()
     // Shader config
     // Defines the maximum sizes in bytes for the ray payload and attribute structure.
     auto shaderConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_SHADER_CONFIG_SUBOBJECT>();
-    UINT payloadSize = 4 * sizeof(float);   // float4 color
+    UINT payloadSize = sizeof(RayPayload);  // float4 color
     UINT attributeSize = 2 * sizeof(float); // float2 barycentrics
     shaderConfig->Config(payloadSize, attributeSize);
 
@@ -253,7 +294,7 @@ void D3D12RaytracingHelloWorld::CreateRaytracingPipelineStateObject()
     auto pipelineConfig = raytracingPipeline.CreateSubobject<CD3DX12_RAYTRACING_PIPELINE_CONFIG_SUBOBJECT>();
     // PERFOMANCE TIP: Set max recursion depth as low as needed
     // as drivers may apply optimization strategies for low recursion depths.
-    UINT maxRecursionDepth = 1; // ~ primary rays only.
+    UINT maxRecursionDepth = D3D12_RAYTRACING_MAX_DECLARABLE_TRACE_RECURSION_DEPTH; // ~ primary rays only.
     pipelineConfig->Config(maxRecursionDepth);
 
 #if _DEBUG
@@ -468,9 +509,16 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
 
     auto BuildAccelerationStructure = [&](auto* raytracingCommandList)
     {
-        raytracingCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
-        commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get()));
-        raytracingCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+        try
+        {
+            raytracingCommandList->BuildRaytracingAccelerationStructure(&bottomLevelBuildDesc, 0, nullptr);
+            commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get()));
+            raytracingCommandList->BuildRaytracingAccelerationStructure(&topLevelBuildDesc, 0, nullptr);
+        }
+        catch (const std::exception& error)
+        {
+            LOG_NOTHROW(error.what());
+        }
     };
 
     // Build acceleration structure.
@@ -508,9 +556,16 @@ void D3D12RaytracingHelloWorld::BuildShaderTables()
 
     auto GetShaderIdentifiers = [&](auto* stateObjectProperties)
     {
-        m_rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
-        missShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
-        hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
+        try
+        {
+            m_rayGenShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_raygenShaderName);
+            missShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_missShaderName);
+            hitGroupShaderIdentifier = stateObjectProperties->GetShaderIdentifier(c_hitGroupName);
+        }
+        catch (const std::exception& error)
+        {
+            LOG_NOTHROW(error.what());
+        }
     };
 
     // Get shader identifiers.
@@ -561,19 +616,27 @@ void D3D12RaytracingHelloWorld::BuildShaderTables()
 // Update frame-based values.
 void D3D12RaytracingHelloWorld::OnUpdate()
 {
-    m_timer.Tick();
-    CalculateFrameStats();
+    try
+    {
+        m_timer.Tick();
+        CalculateFrameStats();
 
-    float timeInMilli = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                               std::chrono::high_resolution_clock::now().time_since_epoch())
-                                               .count());
-    m_rayGenCB.timeNow = timeInMilli;
-    UpdateCamera();
-    // m_cam->RotateRight(std::sin(timeInMilli * .0001f));
-    // m_rayGenCB.origin = XMFLOAT3{ std::sin(timeInMilli * .001f)*3.f, 0.f, 0.f };
-    InitRayGenTable();
-    /*   ReleaseWindowSizeDependentResources();
-       CreateWindowSizeDependentResources();*/
+        float timeInSeconds = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                     std::chrono::high_resolution_clock::now().time_since_epoch())
+                                                     .count());
+
+        timeInSeconds /= 1'000.f;
+
+        m_rayGenCB.timeNow = timeInSeconds;
+        UpdateCamera();
+        InitRayGenTable();
+    /*    ReleaseWindowSizeDependentResources();
+        CreateWindowSizeDependentResources();*/
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 void D3D12RaytracingHelloWorld::DoRaytracing()
@@ -582,20 +645,27 @@ void D3D12RaytracingHelloWorld::DoRaytracing()
 
     auto DispatchRays = [&](auto* commandList, auto* stateObject, auto* dispatchDesc)
     {
-        // Since each shader table has only one shader record, the stride is same as the size.
-        dispatchDesc->HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
-        dispatchDesc->HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
-        dispatchDesc->HitGroupTable.StrideInBytes = dispatchDesc->HitGroupTable.SizeInBytes;
-        dispatchDesc->MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
-        dispatchDesc->MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
-        dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
-        dispatchDesc->RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
-        dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
-        dispatchDesc->Width = m_width;
-        dispatchDesc->Height = m_height;
-        dispatchDesc->Depth = 1;
-        commandList->SetPipelineState1(stateObject);
-        commandList->DispatchRays(dispatchDesc);
+        try
+        {
+            // Since each shader table has only one shader record, the stride is same as the size.
+            dispatchDesc->HitGroupTable.StartAddress = m_hitGroupShaderTable->GetGPUVirtualAddress();
+            dispatchDesc->HitGroupTable.SizeInBytes = m_hitGroupShaderTable->GetDesc().Width;
+            dispatchDesc->HitGroupTable.StrideInBytes = dispatchDesc->HitGroupTable.SizeInBytes;
+            dispatchDesc->MissShaderTable.StartAddress = m_missShaderTable->GetGPUVirtualAddress();
+            dispatchDesc->MissShaderTable.SizeInBytes = m_missShaderTable->GetDesc().Width;
+            dispatchDesc->MissShaderTable.StrideInBytes = dispatchDesc->MissShaderTable.SizeInBytes;
+            dispatchDesc->RayGenerationShaderRecord.StartAddress = m_rayGenShaderTable->GetGPUVirtualAddress();
+            dispatchDesc->RayGenerationShaderRecord.SizeInBytes = m_rayGenShaderTable->GetDesc().Width;
+            dispatchDesc->Width = m_width;
+            dispatchDesc->Height = m_height;
+            dispatchDesc->Depth = 1;
+            commandList->SetPipelineState1(stateObject);
+            commandList->DispatchRays(dispatchDesc);
+        }
+        catch (const std::exception& error)
+        {
+            LOG_NOTHROW(error.what());
+        }
     };
 
     commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
@@ -711,37 +781,65 @@ void D3D12RaytracingHelloWorld::RecreateD3D()
 // Render the scene.
 void D3D12RaytracingHelloWorld::OnRender()
 {
-    if (!m_deviceResources->IsWindowVisible())
+    try
     {
-        return;
+        if (!m_deviceResources->IsWindowVisible())
+        {
+            return;
+        }
+
+        m_deviceResources->Prepare();
+        DoRaytracing();
+        CopyRaytracingOutputToBackbuffer();
+
+        m_deviceResources->Present(D3D12_RESOURCE_STATE_PRESENT);
     }
-
-    m_deviceResources->Prepare();
-    DoRaytracing();
-    CopyRaytracingOutputToBackbuffer();
-
-    m_deviceResources->Present(D3D12_RESOURCE_STATE_PRESENT);
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 void D3D12RaytracingHelloWorld::OnDestroy()
 {
-    // Let GPU finish before releasing D3D resources.
-    m_deviceResources->WaitForGpu();
-    OnDeviceLost();
+    try
+    {
+        // Let GPU finish before releasing D3D resources.
+        m_deviceResources->WaitForGpu();
+        OnDeviceLost();
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 // Release all device dependent resouces when a device is lost.
 void D3D12RaytracingHelloWorld::OnDeviceLost()
 {
-    ReleaseWindowSizeDependentResources();
-    ReleaseDeviceDependentResources();
+    try
+    {
+        ReleaseWindowSizeDependentResources();
+        ReleaseDeviceDependentResources();
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 // Create all device dependent resources when a device is restored.
 void D3D12RaytracingHelloWorld::OnDeviceRestored()
 {
-    CreateDeviceDependentResources();
-    CreateWindowSizeDependentResources();
+    try
+    {
+        CreateDeviceDependentResources();
+        CreateWindowSizeDependentResources();
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 // Compute the average frames per second and million rays per second.
@@ -763,9 +861,9 @@ void D3D12RaytracingHelloWorld::CalculateFrameStats()
 
         float MRaysPerSecond = (m_width * m_height * fps) / static_cast<float>(1e6);
 
-        wstringstream windowText;
+        std::wstringstream windowText;
 
-        windowText << setprecision(2) << fixed << L"    fps: " << fps << L"     ~Million Primary Rays/s: "
+        windowText << std::setprecision(2) << std::fixed << L"    fps: " << fps << L"     ~Million Primary Rays/s: "
                    << MRaysPerSecond << L"    GPU[" << m_deviceResources->GetAdapterID() << L"]: "
                    << m_deviceResources->GetAdapterDescription();
         SetCustomWindowText(windowText.str().c_str());
@@ -775,15 +873,22 @@ void D3D12RaytracingHelloWorld::CalculateFrameStats()
 // Handle OnSizeChanged message event.
 void D3D12RaytracingHelloWorld::OnSizeChanged(UINT width, UINT height, bool minimized)
 {
-    if (!m_deviceResources->WindowSizeChanged(width, height, minimized))
+    try
     {
-        return;
+        if (!m_deviceResources->WindowSizeChanged(width, height, minimized))
+        {
+            return;
+        }
+
+        UpdateForSizeChange(width, height);
+
+        ReleaseWindowSizeDependentResources();
+        CreateWindowSizeDependentResources();
     }
-
-    UpdateForSizeChange(width, height);
-
-    ReleaseWindowSizeDependentResources();
-    CreateWindowSizeDependentResources();
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
 }
 
 // Allocate a descriptor and return its index.
@@ -802,67 +907,101 @@ UINT D3D12RaytracingHelloWorld::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* 
 
 void D3D12RaytracingHelloWorld::OnMouseMove(UINT x, UINT y)
 {
-    static float lastX = (float)x;
-    static float lastY = (float)y;
-    float deltaX = x - lastX;
-    float deltaY = y - lastY;
-    lastX = (float)x;
-    lastY = (float)y;
-
-    if (mouseRotateMode)
+    try
     {
-        m_cam->RotateRight(deltaX);
-        m_cam->RotateUp(deltaY);
+        static float lastX = (float)x;
+        static float lastY = (float)y;
+        float deltaX = x - lastX;
+        float deltaY = y - lastY;
+        lastX = (float)x;
+        lastY = (float)y;
+
+        if (mouseRotateMode)
+        {
+            m_cam->RotateRight(deltaX);
+            m_cam->RotateUp(deltaY);
+        }
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
     }
 }
 
 void D3D12RaytracingHelloWorld::OnKeyDown(UINT8 key)
 {
-    switch (key)
+    try
     {
-    case 'W':
-    case 'w':
-    {
-        m_cam->MoveForward(1.f);
-    }
-    break;
-    case 'S':
-    case 's':
-    {
-        m_cam->MoveForward(-1.f);
-    }
-    break;
-    case 'D':
-    case 'd':
-    {
-        m_cam->MoveRight(1.f);
-    }
-    break;
-    case 'A':
-    case 'a':
-    {
-        m_cam->MoveRight(-1.f);
-    }
-    break;
-    case VK_CONTROL:
-        mouseRotateMode = true;
+        switch (key)
+        {
+        case 'W':
+        case 'w':
+        {
+            m_cam->MoveForward(1.f);
+        }
         break;
-    default:
+        case 'S':
+        case 's':
+        {
+            m_cam->MoveForward(-1.f);
+        }
         break;
+        case 'D':
+        case 'd':
+        {
+            m_cam->MoveRight(1.f);
+        }
+        break;
+        case 'A':
+        case 'a':
+        {
+            m_cam->MoveRight(-1.f);
+        }
+        break;
+        case VK_CONTROL:
+            mouseRotateMode = true;
+            break;
+        default:
+            break;
+        }
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
     }
 }
 
 void D3D12RaytracingHelloWorld::OnKeyUp(UINT8 key)
 {
-    switch (key)
+    try
     {
-    case VK_CONTROL:
-        mouseRotateMode = false;
-        break;
-    default:
-        break;
+        switch (key)
+        {
+        case VK_CONTROL:
+            mouseRotateMode = false;
+            break;
+        default:
+            break;
+        }
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
     }
 }
+
+IDXGISwapChain* D3D12RaytracingHelloWorld::GetSwapchain()
+{
+    try
+    {
+        return m_deviceResources->GetSwapChain();
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
+}
+
 DirectX::XMMATRIX GetSphereTrans(XMFLOAT3 pos, float rad)
 {
     DirectX::XMMATRIX mat = DirectX::XMMatrixScaling(rad, rad, rad) * DirectX::XMMatrixTranslation(pos.x, pos.y, pos.z);
@@ -877,12 +1016,12 @@ void D3D12RaytracingHelloWorld::InitializeScene()
     //  size_t sphereIdx = m_scene.LoadModel("knight/knight.obj");
     // size_t sphereIdx = m_scene.LoadModel("backpack/backpack.obj");
 
+    // DUDU refactor material indices
+    //
     // DirectX::XMMATRIX mat = DirectX::XMMatrixTranslation(0.f, 0.f, -1.f);
     DirectX::XMMATRIX mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
-    // DUDU refactor material indices
     m_scene.AddInstance(sphereIdx, mat, 0);
     mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
-    // mat = DirectX::XMMatrixScaling(.5f, .5f, .5f) * DirectX::XMMatrixTranslation(2.f, 0.f, -1.f);
     m_scene.AddInstance(sphereIdx, mat, 0);
 }
 

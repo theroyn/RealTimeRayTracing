@@ -21,6 +21,7 @@ using Index = UINT16;
 
 using XMFLOAT4 = DirectX::XMFLOAT4;
 using XMFLOAT3 = DirectX::XMFLOAT3;
+using XMFLOAT2 = DirectX::XMFLOAT2;
 using XMVECTOR = DirectX::XMVECTOR;
 #endif
 
@@ -82,6 +83,15 @@ struct PrimitiveMaterialBuffer
     BOOL hasNormalTexture;
     BOOL hasPerVertexTangents;
     MaterialType::Type type;
+};
+
+struct RayPayload
+{
+    XMFLOAT4 color;
+
+    float timeVal;
+    int currentRecursionDepth;
+    XMFLOAT2 padding;
 };
 
 #endif // RAYTRACINGHLSLCOMPAT_H

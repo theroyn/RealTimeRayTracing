@@ -27,44 +27,27 @@ StructuredBuffer<PrimitiveMaterialBuffer> g_materials : register(t3);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
-struct RayPayload
-{
-    float4 color;
-};
-
-float3 GetNormal()
-{
-    uint indexSizeInBytes = 2;
-    uint indicesPerTriangle = 3;
-    uint triangleIndexStride = indicesPerTriangle * indexSizeInBytes;
-    uint baseIndex = PrimitiveIndex() * triangleIndexStride;
-
-    // Load up three 16 bit indices for the triangle.
-    const uint3 indices = Load3x16BitIndices(baseIndex, g_indices);
-
-    // Retrieve corresponding vertex normals for the triangle vertices.
-    float3 triangleNormal = g_vertices[indices[0]].normal;
-
-    return triangleNormal;
-}
-
 [shader("raygeneration")] void MyRaygenShader()
 {
     float timeVal = sin(g_rayGenCB.timeNow * .01f) * .5f + .5f;
     float2 dims = DispatchRaysDimensions().xy;
-    int samples_per_pixel = 100;
+    float2 uv = (float2)DispatchRaysIndex() / dims;
+    int samples_per_pixel = 30;
     float3 color = float3(0.f, 0.f, 0.f);
     for (int s = 0; s < samples_per_pixel; ++s)
     {
-        RayPayload payload = { float4(0, 0, 0, 0) };
-        float2 uv = (float2)DispatchRaysIndex() / dims;
-        float2 lerpValues = ((float2)DispatchRaysIndex() + rand2(uv, timeVal)) / dims;
+        RayPayload payload;
+        float stepPart = (float)s / (float)samples_per_pixel;
+        float2 step = gold2(DispatchRaysDimensions().xy, fract(g_rayGenCB.timeNow) + stepPart);
+        float2 lerpValues = (DispatchRaysIndex().xy + step) / (dims - 1.f);
 
         float3 currentPixel = g_rayGenCB.leftCorner.xyz + lerpValues.x * g_rayGenCB.vpHorizontal +
                               (1.f - lerpValues.y) * g_rayGenCB.vpVertical;
 
-        // Trace the ray.
-        // Set the ray's extents.
+        payload.color = float4(0.f, 0.f, 0.f, 0.f);
+        payload.timeVal = g_rayGenCB.timeNow + stepPart;
+        payload.currentRecursionDepth = 0;
+
         RayDesc ray;
         ray.Origin = g_rayGenCB.origin;
         ray.Direction = normalize(currentPixel - g_rayGenCB.origin);
@@ -77,44 +60,51 @@ float3 GetNormal()
 
         color += payload.color.xyz;
     }
-    float scale = scale = 1.0 / samples_per_pixel;
-    color *= scale;
 
-    // Write the raytraced color to the output texture.
+    float scale = scale = 1.f / (float)samples_per_pixel;
+
+    color = sqrt(scale * color);
+
     RenderTarget[DispatchRaysIndex().xy] = float4(color, 1.f);
 }
 
+#define MAX_RECURSION 25
+
     [shader("closesthit")] void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
-    float4 lightPos = float4(4.f, 10.f, -1.f, 1.f);
-    float3 lightDiffuse = float3(.4f, .4f, .4f);
-    float3 lightAmbience = float3(.05f, .05f, .05f);
-    float3 lightSpecular = float3(.5f, .5f, .5f);
-    float3 lightColor = float3(1.f, 1.f, 1.f);
-    uint instanceID = InstanceID();
-    float objectShinines = 8.f;
-    PrimitiveMaterialBuffer material = g_materials[instanceID];
-    float3 objectColor = material.albedo;
+    if (++payload.currentRecursionDepth == MAX_RECURSION)
+    {
+        payload.color = float4(0.f, 0.f, 0.f, 1.f);
+        return;
+    }
 
-    // assuming object is centered around the origin
-    float3 worldCenter = mul(float4(0.f, 0.f, 0.f, 1.f), ObjectToWorld4x3()).xyz;
-    float3 worldPos = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-    float3 realNormal = normalize(worldPos - worldCenter);
-    float3 outColor;
+    // assuming object is a sphere centered around the origin
+    float3 p = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 
-    // Retrieve corresponding vertex normals for the triangle vertices.
-    float3 triangleNormal = GetNormal();
-    float3 barycentrics =
-        float3(1 - attr.barycentrics.x - attr.barycentrics.y, attr.barycentrics.x, attr.barycentrics.y);
-    float3 currentNormal = barycentrics * triangleNormal;
-    float3 objectToLight = normalize(lightPos.xyz - worldPos);
+    float3 pInObjectSpace = mul(WorldToObject3x4(), float4(p, 1.f)).xyz;
 
-    float diffuse = max(0.f, dot(objectToLight, realNormal));
-    float3 reflected = reflect(WorldRayDirection(), realNormal);
-    float specular = pow(objectShinines, max(0.f, (dot(reflected, objectToLight))));
+    float3 normal = normalize(pInObjectSpace);
 
-    outColor = (lightAmbience + specular * lightSpecular + diffuse * lightDiffuse) * lightColor * objectColor;
-    payload.color = float4(outColor, 1);
+    float2 dims = DispatchRaysDimensions().xy;
+
+    float2 uv = (float2)DispatchRaysIndex() / dims;
+
+    // float3 target = p + randomInHemisphere(normal, DispatchRaysIndex().xy, fract(payload.timeVal));
+    float3 target = p + normal + randomInUnitVector(DispatchRaysIndex().xy, fract(payload.timeVal));
+
+    RayPayload currentPayload = payload;
+    currentPayload.color = float4(0.f, 0.f, 0.f, 0.f);
+
+    RayDesc ray;
+
+    ray.Origin = p;
+    ray.Direction = normalize(target - p);
+    ray.TMin = 0.0001;
+    ray.TMax = 10000.0;
+
+    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, currentPayload);
+
+    payload.color = .5f * currentPayload.color;
 }
 
 [shader("miss")] void MyMissShader(inout RayPayload payload)
