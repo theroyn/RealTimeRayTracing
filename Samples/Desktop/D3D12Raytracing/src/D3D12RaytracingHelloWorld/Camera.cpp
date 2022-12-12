@@ -4,32 +4,37 @@
 
 using namespace DirectX;
 
-DirectX::XMVECTOR Camera::GetRight()
+DirectX::XMVECTOR Camera::GetRight() const
 {
     return XMVector3Normalize(XMVector3Cross(GetForward(), vup));
 }
-DirectX::XMVECTOR Camera::GetUp()
+DirectX::XMVECTOR Camera::GetUp() const
 {
     return XMVector3Normalize(XMVector3Cross(GetRight(), GetForward()));
 }
 
-DirectX::XMVECTOR Camera::GetForward()
+DirectX::XMVECTOR Camera::GetForward() const
 {
     return XMVector3Normalize(lookAt - lookFrom);
 }
 
-DirectX::XMVECTOR Camera::GetLookFrom()
+DirectX::XMVECTOR Camera::GetLookFrom() const
 {
     return lookFrom;
 }
 
-DirectX::XMVECTOR Camera::GetLookAt()
+DirectX::XMVECTOR Camera::GetLookAt() const
 {
     return lookAt;
 }
 
-Camera::Camera(DirectX::XMVECTOR pos, DirectX::XMVECTOR lookAt, DirectX::XMVECTOR up)
-    : lookFrom(pos), lookAt(lookAt), vup(up)
+float Camera::GetVFOV() const
+{
+    return vfov;
+}
+
+Camera::Camera(DirectX::XMVECTOR pos, DirectX::XMVECTOR lookAt, DirectX::XMVECTOR up, float vfov)
+    : lookFrom(pos), lookAt(lookAt), vup(up), vfov(vfov)
 {
     // transform = XMMatrixTranspose(XMMatrixLookAtRH(pos, lookAt, up));
 }

@@ -70,7 +70,15 @@ void D3D12RaytracingHelloWorld::InitializeCamera()
     XMVECTOR lookfrom{ 0.f, 0.f, 0.f, 1.f };
     XMVECTOR lookat{ 0.f, 0.f, -1.f, 1.f };
     XMVECTOR vup{ 0., 1., 0. };
-    m_cam = std::make_shared<Camera>(lookfrom, lookat, vup);
+    float vfov = 90.f;
+    m_cam = std::make_shared<Camera>(lookfrom, lookat, vup, vfov);
+}
+
+static constexpr float PI = 3.1415926535897932385f;
+
+static inline float degrees_to_radians(float degrees)
+{
+    return degrees * PI / 180.f;
 }
 
 void D3D12RaytracingHelloWorld::UpdateCamera()
@@ -80,9 +88,12 @@ void D3D12RaytracingHelloWorld::UpdateCamera()
     XMVECTOR forward = m_cam->GetForward();
     XMVECTOR up = m_cam->GetUp();
     XMVECTOR right = m_cam->GetRight();
+    float vfov = m_cam->GetVFOV();
 
+    float theta = degrees_to_radians(vfov);
+    float h = tan(theta / 2);
     float aspectRatio = (float)GetWidth() / (float)GetHeight();
-    float vpHeight = 2.f;
+    float vpHeight = 2.f * h;
     float vpWidth = aspectRatio * vpHeight;
     float focalLength = 1.f;
 
@@ -1023,15 +1034,26 @@ void D3D12RaytracingHelloWorld::InitializeScene()
     static constexpr size_t LEFT = 2;
     static constexpr size_t RIGHT = 3;
     DirectX::XMMATRIX mat;
+    float R = cos(PI / 4);
 
-    mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
-    m_scene.AddInstance(sphereIdx, mat, GROUND);
-    mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
-    m_scene.AddInstance(sphereIdx, mat, CENTER);
-    mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
+    mat = GetSphereTrans(XMFLOAT3{ -R, 0.f, -1.f }, R);
     m_scene.AddInstance(sphereIdx, mat, LEFT);
-    mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
+    mat = GetSphereTrans(XMFLOAT3{ R, 0.f, -1.f }, R);
     m_scene.AddInstance(sphereIdx, mat, RIGHT);
+    /*  mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
+      m_scene.AddInstance(sphereIdx, mat, GROUND);
+      mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
+      m_scene.AddInstance(sphereIdx, mat, CENTER);
+      mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
+      m_scene.AddInstance(sphereIdx, mat, LEFT);*/
+    /**
+     * negative radius for a "bubble" dielectric:
+     *     mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, -.4f);
+     *     m_scene.AddInstance(sphereIdx, mat, LEFT);
+     */
+    // world.add(make_shared<sphere>(point3(-1.0, 0.0, -1.0), -0.4, material_left));
+    // mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
+    // m_scene.AddInstance(sphereIdx, mat, RIGHT);
 }
 
 void D3D12RaytracingHelloWorld::InitializeMaterials()
@@ -1051,14 +1073,15 @@ void D3D12RaytracingHelloWorld::InitializeMaterials()
     }
     {
         PrimitiveMaterialBuffer left = {};
-        left.type = MaterialType::Dielectric;
+        left.type = MaterialType::Lambertian;
+        left.albedo = XMFLOAT3{ 0.f, 0.f, 1.f };
         left.refractionIndex = 1.5f;
         m_materials.push_back(left);
     }
     {
         PrimitiveMaterialBuffer right = {};
-        right.type = MaterialType::Metal;
-        right.albedo = XMFLOAT3{ .8f, .6f, .2f };
+        right.type = MaterialType::Lambertian;
+        right.albedo = XMFLOAT3{ 1.f, 0.f, 0.f };
         right.fuzz = 0.f;
         m_materials.push_back(right);
     }
