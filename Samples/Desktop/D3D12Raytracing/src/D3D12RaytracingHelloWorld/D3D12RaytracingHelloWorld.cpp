@@ -1053,12 +1053,14 @@ void D3D12RaytracingHelloWorld::InitializeMaterials()
         PrimitiveMaterialBuffer left = {};
         left.type = MaterialType::Metal;
         left.albedo = XMFLOAT3{ .8f, .8f, .8f };
+        left.fuzz = .3f;
         m_materials.push_back(left);
     }
     {
         PrimitiveMaterialBuffer right = {};
         right.type = MaterialType::Metal;
         right.albedo = XMFLOAT3{ .8f, .6f, .2f };
+        right.fuzz = 1.f;
         m_materials.push_back(right);
     }
 

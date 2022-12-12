@@ -116,7 +116,8 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
         attenuation = material.albedo;
         float3 reflected = reflect(WorldRayDirection(), normal);
         ray.Origin = p;
-        ray.Direction = normalize(reflected);
+        ray.Direction =
+            normalize(reflected + randomInUnitSphere(DispatchRaysIndex().xy, fract(payload.timeVal)) * material.fuzz);
         scatter = (dot(ray.Direction, normal) > 0);
     }
 
