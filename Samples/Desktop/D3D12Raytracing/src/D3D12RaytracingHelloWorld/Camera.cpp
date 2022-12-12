@@ -89,3 +89,15 @@ void Camera::MoveRight(float d)
     lookFrom = XMVector3TransformCoord(lookFrom, trans);
     lookAt = XMVector3TransformCoord(lookAt, trans);
 }
+
+void Camera::Zoom(float d)
+{
+    static constexpr float ZOOM_SPEED = .01f;
+    vfov += ZOOM_SPEED * d;
+}
+
+void Camera::ChangeAperture(float d)
+{
+    static constexpr float APERTURE_SPEED = .01f;
+    aperture += APERTURE_SPEED * d;
+}

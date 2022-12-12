@@ -10,8 +10,9 @@
 //*********************************************************
 
 #include "stdafx.h"
-#include "Win32Application.h"
+
 #include "DXSampleHelper.h"
+#include "Win32Application.h"
 
 HWND Win32Application::m_hwnd = nullptr;
 bool Win32Application::m_fullscreenMode = false;
@@ -42,18 +43,11 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
         AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
         // Create the window and store a handle to it.
-        m_hwnd = CreateWindow(
-            windowClass.lpszClassName,
-            pSample->GetTitle(),
-            m_windowStyle,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            windowRect.right - windowRect.left,
-            windowRect.bottom - windowRect.top,
-            nullptr,        // We have no parent window.
-            nullptr,        // We aren't using menus.
-            hInstance,
-            pSample);
+        m_hwnd = CreateWindow(windowClass.lpszClassName, pSample->GetTitle(), m_windowStyle, CW_USEDEFAULT,
+                              CW_USEDEFAULT, windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
+                              nullptr, // We have no parent window.
+                              nullptr, // We aren't using menus.
+                              hInstance, pSample);
 
         // Initialize the sample. OnInit is defined in each child-implementation of DXSample.
         pSample->OnInit();
@@ -96,14 +90,9 @@ void Win32Application::ToggleFullscreenWindow(IDXGISwapChain* pSwapChain)
         // Restore the window's attributes and size.
         SetWindowLong(m_hwnd, GWL_STYLE, m_windowStyle);
 
-        SetWindowPos(
-            m_hwnd,
-            HWND_NOTOPMOST,
-            m_windowRect.left,
-            m_windowRect.top,
-            m_windowRect.right - m_windowRect.left,
-            m_windowRect.bottom - m_windowRect.top,
-            SWP_FRAMECHANGED | SWP_NOACTIVATE);
+        SetWindowPos(m_hwnd, HWND_NOTOPMOST, m_windowRect.left, m_windowRect.top,
+                     m_windowRect.right - m_windowRect.left, m_windowRect.bottom - m_windowRect.top,
+                     SWP_FRAMECHANGED | SWP_NOACTIVATE);
 
         ShowWindow(m_hwnd, SW_NORMAL);
     }
@@ -113,7 +102,8 @@ void Win32Application::ToggleFullscreenWindow(IDXGISwapChain* pSwapChain)
         GetWindowRect(m_hwnd, &m_windowRect);
 
         // Make the window borderless so that the client area can fill the screen.
-        SetWindowLong(m_hwnd, GWL_STYLE, m_windowStyle & ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME));
+        SetWindowLong(m_hwnd, GWL_STYLE,
+                      m_windowStyle & ~(WS_CAPTION | WS_MAXIMIZEBOX | WS_MINIMIZEBOX | WS_SYSMENU | WS_THICKFRAME));
 
         RECT fullscreenWindowRect;
         try
@@ -142,23 +132,13 @@ void Win32Application::ToggleFullscreenWindow(IDXGISwapChain* pSwapChain)
             devMode.dmSize = sizeof(DEVMODE);
             EnumDisplaySettings(nullptr, ENUM_CURRENT_SETTINGS, &devMode);
 
-            fullscreenWindowRect = {
-                devMode.dmPosition.x,
-                devMode.dmPosition.y,
-                devMode.dmPosition.x + static_cast<LONG>(devMode.dmPelsWidth),
-                devMode.dmPosition.y + static_cast<LONG>(devMode.dmPelsHeight)
-            };
+            fullscreenWindowRect = { devMode.dmPosition.x, devMode.dmPosition.y,
+                                     devMode.dmPosition.x + static_cast<LONG>(devMode.dmPelsWidth),
+                                     devMode.dmPosition.y + static_cast<LONG>(devMode.dmPelsHeight) };
         }
 
-        SetWindowPos(
-            m_hwnd,
-            HWND_TOPMOST,
-            fullscreenWindowRect.left,
-            fullscreenWindowRect.top,
-            fullscreenWindowRect.right,
-            fullscreenWindowRect.bottom,
-            SWP_FRAMECHANGED | SWP_NOACTIVATE);
-
+        SetWindowPos(m_hwnd, HWND_TOPMOST, fullscreenWindowRect.left, fullscreenWindowRect.top,
+                     fullscreenWindowRect.right, fullscreenWindowRect.bottom, SWP_FRAMECHANGED | SWP_NOACTIVATE);
 
         ShowWindow(m_hwnd, SW_MAXIMIZE);
     }
@@ -171,16 +151,29 @@ void Win32Application::SetWindowZorderToTopMost(bool setToTopMost)
     RECT windowRect;
     GetWindowRect(m_hwnd, &windowRect);
 
-    SetWindowPos(
-        m_hwnd,
-        (setToTopMost) ? HWND_TOPMOST : HWND_NOTOPMOST,
-        windowRect.left,
-        windowRect.top,
-        windowRect.right - windowRect.left,
-        windowRect.bottom - windowRect.top,
-        SWP_FRAMECHANGED | SWP_NOACTIVATE);
+    SetWindowPos(m_hwnd, (setToTopMost) ? HWND_TOPMOST : HWND_NOTOPMOST, windowRect.left, windowRect.top,
+                 windowRect.right - windowRect.left, windowRect.bottom - windowRect.top,
+                 SWP_FRAMECHANGED | SWP_NOACTIVATE);
 }
 
+std::vector<unsigned char> GetKeys()
+{
+    std::vector<unsigned char> keys;
+    int idx = 0;
+    for (auto c = _T('A'); c != _T('Z'); ++c, ++idx)
+    {
+        if ((::GetKeyState(c) & 0x8000))
+        {
+            keys.push_back('A' + idx);
+        }
+    }
+    if ((::GetKeyState(VK_CONTROL) & 0x8000))
+    {
+        keys.push_back(VK_CONTROL);
+    }
+
+    return keys;
+}
 // Main message handler for the sample.
 LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -194,12 +187,16 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         LPCREATESTRUCT pCreateStruct = reinterpret_cast<LPCREATESTRUCT>(lParam);
         SetWindowLongPtr(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(pCreateStruct->lpCreateParams));
     }
-    return 0;
+        return 0;
 
     case WM_KEYDOWN:
         if (pSample)
         {
-            pSample->OnKeyDown(static_cast<UINT8>(wParam));
+            std::vector<unsigned char> keys = GetKeys();
+            for (auto key : keys)
+            {
+                pSample->OnKeyDown(static_cast<UINT8>(key));
+            }
         }
         if (wParam == VK_ESCAPE)
         {
@@ -243,7 +240,8 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
 
             RECT clientRect = {};
             GetClientRect(hWnd, &clientRect);
-            pSample->OnSizeChanged(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top, wParam == SIZE_MINIMIZED);
+            pSample->OnSizeChanged(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top,
+                                   wParam == SIZE_MINIMIZED);
         }
         return 0;
 
@@ -275,6 +273,14 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
             pSample->OnMouseMove(x, y);
         }
         return 0;
+    case WM_MOUSEWHEEL:
+        if (pSample)
+        {
+            short zDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+
+            pSample->OnMouseWheel(zDelta);
+        }
+        return 0;
 
     case WM_LBUTTONDOWN:
     {
@@ -282,7 +288,7 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         UINT y = HIWORD(lParam);
         pSample->OnLeftButtonDown(x, y);
     }
-    return 0;
+        return 0;
 
     case WM_LBUTTONUP:
     {
@@ -290,7 +296,7 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
         UINT y = HIWORD(lParam);
         pSample->OnLeftButtonUp(x, y);
     }
-    return 0;
+        return 0;
 
     case WM_DESTROY:
         PostQuitMessage(0);

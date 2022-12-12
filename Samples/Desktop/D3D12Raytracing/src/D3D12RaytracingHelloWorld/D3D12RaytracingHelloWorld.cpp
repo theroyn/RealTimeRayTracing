@@ -50,15 +50,21 @@ inline XMFLOAT3 random3(float min, float max)
 
 void D3D12RaytracingHelloWorld::Log(const std::string& msg, const std::string& func, int line)
 {
-    std::time_t now = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    typedef std::chrono::system_clock Clock;
+    auto now = Clock::now();
+    auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
+    auto fraction = now - seconds;
+    time_t cnow = Clock::to_time_t(now);
+    auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(fraction);
+
     struct tm tmBuf;
     char buf[26] = { 0 };
-    localtime_s(&tmBuf, &now);
+    localtime_s(&tmBuf, &cnow);
     asctime_s(buf, sizeof buf, &tmBuf);
 
     std::string tmpTimeStr = buf;
     std::string timeStr = tmpTimeStr.substr(0, tmpTimeStr.length() - 1);
-    m_logFd << timeStr << ":" << func << ":" << line << " - " << msg << std::endl;
+    m_logFd << timeStr << ":" << milliseconds.count() << ":" << func << ":" << line << " - " << msg << std::endl;
 }
 
 #define LOG(msg)                                                                                                       \
@@ -944,9 +950,22 @@ void D3D12RaytracingHelloWorld::OnMouseMove(UINT x, UINT y)
 
         if (mouseRotateMode)
         {
-            m_cam->RotateRight(deltaX);
-            m_cam->RotateUp(deltaY);
+            m_cam->RotateRight(-deltaX);
+            m_cam->RotateUp(-deltaY);
         }
+    }
+    catch (const std::exception& error)
+    {
+        LOG(error.what());
+    }
+}
+
+void D3D12RaytracingHelloWorld::OnMouseWheel(short delta)
+{
+    try
+    {
+        LOG_NOTHROW(std::to_string(delta));
+        m_cam->Zoom(delta);
     }
     catch (const std::exception& error)
     {
@@ -958,6 +977,7 @@ void D3D12RaytracingHelloWorld::OnKeyDown(UINT8 key)
 {
     try
     {
+        LOG_NOTHROW(std::to_string(key));
         switch (key)
         {
         case 'W':
@@ -982,6 +1002,18 @@ void D3D12RaytracingHelloWorld::OnKeyDown(UINT8 key)
         case 'a':
         {
             m_cam->MoveRight(-1.f);
+        }
+        break;
+        case 'E':
+        case 'e':
+        {
+            m_cam->ChangeAperture(1.f);
+        }
+        break;
+        case 'Q':
+        case 'q':
+        {
+            m_cam->ChangeAperture(-1.f);
         }
         break;
         case VK_CONTROL:

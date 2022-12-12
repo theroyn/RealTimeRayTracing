@@ -32,7 +32,7 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
     float timeVal = sin(g_rayGenCB.timeNow * .01f) * .5f + .5f;
     float2 dims = DispatchRaysDimensions().xy;
     float2 uv = (float2)DispatchRaysIndex() / dims;
-    int samples_per_pixel = 10;
+    int samples_per_pixel = 20;
     float3 color = float3(0.f, 0.f, 0.f);
     for (int s = 0; s < samples_per_pixel; ++s)
     {
