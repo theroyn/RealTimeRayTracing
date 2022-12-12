@@ -68,14 +68,13 @@ D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, st
 void D3D12RaytracingHelloWorld::InitializeCamera()
 {
     using namespace DirectX;
-    XMVECTOR lookfrom{ 3.f, 3.f, 2.f, 1.f };
-    XMVECTOR lookat{ 0.f, 0.f, -1.f, 1.f };
+    XMVECTOR lookfrom{ 13.f, 2.f, 3.f, 1.f };
+    XMVECTOR lookat{ 0.f, 0.f, 0.f, 1.f };
     XMVECTOR vup{ 0., 1., 0. };
     float vfov = 20.f;
-    XMVECTOR focusDistVec = XMVector3Length(lookfrom - lookat);
-    float focusDist;
-    XMStoreFloat(&focusDist, focusDistVec);
-    m_cam = std::make_shared<Camera>(lookfrom, lookat, vup, vfov, 2.f, focusDist);
+    float focusDist = 10.f;
+    float aperture = .1f;
+    m_cam = std::make_shared<Camera>(lookfrom, lookat, vup, vfov, aperture, focusDist);
 }
 
 void D3D12RaytracingHelloWorld::UpdateCamera()
@@ -1011,6 +1010,67 @@ DirectX::XMMATRIX GetSphereTrans(XMFLOAT3 pos, float rad)
     return mat;
 }
 
+void D3D12RaytracingHelloWorld::AddSphereAndMaterial(size_t sphereIdx, const DirectX::XMMATRIX& transform,
+                                                     const MaterialInterface& material)
+{
+    m_materials.push_back(material.GetMaterial());
+    size_t materialIdx = m_materials.size() - 1;
+    m_scene.AddInstance(sphereIdx, transform, (unsigned int)materialIdx);
+}
+
+class D3D12RaytracingHelloWorld::Lambertian : public D3D12RaytracingHelloWorld::MaterialInterface
+{
+public:
+    Lambertian(const DirectX::XMFLOAT3& albedo) : albedo(albedo) {}
+    virtual PrimitiveMaterialBuffer GetMaterial() const override
+    {
+        PrimitiveMaterialBuffer mat = {};
+        mat.type = MaterialType::Lambertian;
+        mat.albedo = albedo;
+
+        return mat;
+    }
+
+private:
+    DirectX::XMFLOAT3 albedo;
+};
+
+class D3D12RaytracingHelloWorld::Metal : public D3D12RaytracingHelloWorld::MaterialInterface
+{
+public:
+    Metal(const DirectX::XMFLOAT3& albedo, float fuzz) : albedo(albedo), fuzz(fuzz) {}
+    virtual PrimitiveMaterialBuffer GetMaterial() const override
+    {
+        PrimitiveMaterialBuffer mat = {};
+        mat.type = MaterialType::Metal;
+        mat.albedo = albedo;
+        mat.fuzz = fuzz;
+
+        return mat;
+    }
+
+private:
+    DirectX::XMFLOAT3 albedo;
+    float fuzz;
+};
+
+class D3D12RaytracingHelloWorld::Dielectric : public MaterialInterface
+{
+public:
+    Dielectric(float refractionIndex) : refractionIndex(refractionIndex) {}
+    virtual PrimitiveMaterialBuffer GetMaterial() const override
+    {
+        PrimitiveMaterialBuffer mat = {};
+        mat.type = MaterialType::Dielectric;
+        mat.refractionIndex = refractionIndex;
+
+        return mat;
+    }
+
+private:
+    float refractionIndex;
+};
+
 void D3D12RaytracingHelloWorld::InitializeScene()
 {
     // size_t sphereIdx = m_scene.LoadModel("skull_obj/Skull.obj");
@@ -1019,57 +1079,28 @@ void D3D12RaytracingHelloWorld::InitializeScene()
     //  size_t sphereIdx = m_scene.LoadModel("knight/knight.obj");
     // size_t sphereIdx = m_scene.LoadModel("backpack/backpack.obj");
 
-    // DUDU refactor material indices
-    //
-    static constexpr size_t GROUND = 0;
-    static constexpr size_t CENTER = 1;
-    static constexpr size_t LEFT = 2;
-    static constexpr size_t RIGHT = 3;
     DirectX::XMMATRIX mat;
-    float R = cos(PI / 4);
+
+    Lambertian ground(XMFLOAT3{ 0.8f, 0.8f, 0.f });
+    Lambertian center(XMFLOAT3{ .1f, .2f, .5f });
+    Dielectric left(1.5f);
+    Metal right(XMFLOAT3{ .8f, .6f, .2f }, 0.f);
 
     mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
-    m_scene.AddInstance(sphereIdx, mat, GROUND);
+    AddSphereAndMaterial(sphereIdx, mat, ground);
     mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
-    m_scene.AddInstance(sphereIdx, mat, CENTER);
+    AddSphereAndMaterial(sphereIdx, mat, center);
     mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
+    AddSphereAndMaterial(sphereIdx, mat, left);
     // negative radius for a "bubble" dielectric:
-    m_scene.AddInstance(sphereIdx, mat, LEFT);
     mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, -.45f);
-    m_scene.AddInstance(sphereIdx, mat, LEFT);
+    AddSphereAndMaterial(sphereIdx, mat, left);
     mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
-    m_scene.AddInstance(sphereIdx, mat, RIGHT);
+    AddSphereAndMaterial(sphereIdx, mat, right);
 }
 
 void D3D12RaytracingHelloWorld::InitializeMaterials()
 {
-    // DUDU refactor
-    {
-        PrimitiveMaterialBuffer ground = {};
-        ground.type = MaterialType::Lambertian;
-        ground.albedo = XMFLOAT3{ 0.8f, 0.8f, 0.f };
-        m_materials.push_back(ground);
-    }
-    {
-        PrimitiveMaterialBuffer center = {};
-        center.type = MaterialType::Lambertian;
-        center.albedo = XMFLOAT3{ .1f, .2f, .5f };
-        m_materials.push_back(center);
-    }
-    {
-        PrimitiveMaterialBuffer left = {};
-        left.type = MaterialType::Dielectric;
-        left.refractionIndex = 1.5f;
-        m_materials.push_back(left);
-    }
-    {
-        PrimitiveMaterialBuffer right = {};
-        right.type = MaterialType::Metal;
-        right.albedo = XMFLOAT3{ .8f, .6f, .2f };
-        right.fuzz = 0.f;
-        m_materials.push_back(right);
-    }
-
     auto device = m_deviceResources->GetD3DDevice();
     m_materialBuffer.Create(device, static_cast<UINT>(m_materials.size()), 1, L"Structured buffer: materials");
     copy(m_materials.begin(), m_materials.end(), m_materialBuffer.begin());

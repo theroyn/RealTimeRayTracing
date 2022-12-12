@@ -13,10 +13,10 @@
 
 #include "Camera.h"
 #include "DXSample.h"
-#include "RaytracingHlslCompat.h"
-#include "StepTimer.h"
 #include "Model.h"
+#include "RaytracingHlslCompat.h"
 #include "Scene.h"
+#include "StepTimer.h"
 
 #include <fstream>
 
@@ -44,6 +44,15 @@ enum Value
 class ShaderTable;
 class D3D12RaytracingHelloWorld : public DXSample
 {
+    class MaterialInterface
+    {
+    public:
+        virtual PrimitiveMaterialBuffer GetMaterial() const = 0;
+    };
+    class Lambertian;
+    class Metal;
+    class Dielectric;
+
 public:
     D3D12RaytracingHelloWorld(UINT width, UINT height, std::wstring name);
 
@@ -143,5 +152,6 @@ private:
     UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
     void InitializeScene();
     void InitializeMaterials();
+    void AddSphereAndMaterial(size_t sphereIdx, const DirectX::XMMATRIX& transform, const MaterialInterface& material);
     void Log(const std::string& msg, const std::string& func, int line);
 };
