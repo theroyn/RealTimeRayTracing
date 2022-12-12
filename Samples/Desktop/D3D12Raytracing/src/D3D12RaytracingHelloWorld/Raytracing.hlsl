@@ -135,8 +135,11 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
         float sin_theta = sqrt(1.f - cos_theta * cos_theta);
 
         bool cannot_refract = refractionRatio * sin_theta > 1.f;
+
         float3 direction;
-        if (cannot_refract)
+
+        if (cannot_refract ||
+            (reflectance(cos_theta, refractionRatio) > gold(DispatchRaysIndex().xy, fract(payload.timeVal))))
         {
             direction = reflect(WorldRayDirection(), normal);
         }

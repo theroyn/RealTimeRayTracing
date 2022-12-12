@@ -167,6 +167,12 @@ float gold_noise(in float2 xy, in float seed)
 {
     return fract(tan(distance(xy * PHI, xy) * seed) * xy.x);
 }
+
+float gold(in float2 xy, in float seed)
+{
+    return gold_noise(DispatchRaysIndex().xy, seed + 0.1f);
+}
+
 float2 gold2(in float2 xy, in float seed)
 {
     return float2(gold_noise(DispatchRaysIndex().xy, seed + 0.1f), gold_noise(DispatchRaysIndex().xy, seed + 0.2f));
@@ -223,6 +229,14 @@ float3 MyRefract(float3 uv, float3 n, float etai_over_etat)
     float3 r_out_perp = etai_over_etat * (uv + cos_theta * n);
     float3 r_out_parallel = -sqrt(abs(1.f - lengthSquared(r_out_perp))) * n;
     return r_out_perp + r_out_parallel;
+}
+
+float reflectance(float cosine, float refIdx)
+{
+    // Use Schlick's approximation for reflectance.
+    float r0 = (1 - refIdx) / (1.f + refIdx);
+    r0 = r0 * r0;
+    return r0 + (1.f - r0) * pow((1.f - cosine), 5.f);
 }
 
 #endif // RAYTRACINGSHADERHELPER_H
