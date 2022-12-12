@@ -209,11 +209,20 @@ float3 randomInHemisphere(const float3 normal, float2 uv, float timeVal)
 }
 
 #define EPS 1e-8
+#define MAX_RECURSION 25
 
 bool nearZero(float3 e)
 {
     // Return true if the vector is close to zero in all dimensions.
     return (abs(e[0]) < EPS) && (abs(e[1]) < EPS) && (abs(e[2]) < EPS);
+}
+
+float3 MyRefract(float3 uv, float3 n, float etai_over_etat)
+{
+    float cos_theta = min(dot(-uv, n), 1.f);
+    float3 r_out_perp = etai_over_etat * (uv + cos_theta * n);
+    float3 r_out_parallel = -sqrt(abs(1.f - lengthSquared(r_out_perp))) * n;
+    return r_out_perp + r_out_parallel;
 }
 
 #endif // RAYTRACINGSHADERHELPER_H

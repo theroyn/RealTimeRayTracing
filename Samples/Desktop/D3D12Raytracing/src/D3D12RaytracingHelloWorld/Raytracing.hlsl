@@ -68,8 +68,6 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
     RenderTarget[DispatchRaysIndex().xy] = float4(color, 1.f);
 }
 
-#define MAX_RECURSION 25
-
     [shader("closesthit")] void MyClosestHitShader(inout RayPayload payload, in MyAttributes attr)
 {
     if (++payload.currentRecursionDepth == MAX_RECURSION)
@@ -84,12 +82,18 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
     float3 pInObjectSpace = mul(WorldToObject3x4(), float4(p, 1.f)).xyz;
 
     float3 normal = normalize(pInObjectSpace);
+    bool isFrontFace = dot(WorldRayDirection(), normal) < 0;
+    if (!isFrontFace)
+    { // normal should always face the incoming ray
+        normal = -normal;
+    }
 
     RayPayload currentPayload = payload;
     RayDesc ray;
     float3 attenuation = float3(0.f, 0.f, 0.f);
     PrimitiveMaterialBuffer material = g_materials[InstanceID()];
     bool scatter = false;
+    uint rayFlags = 0;
     if (material.type == MaterialType::Lambertian)
     {
         attenuation = material.albedo;
@@ -108,6 +112,7 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
         ray.Origin = p;
         ray.Direction = normalize(target);
         scatter = true;
+        rayFlags |= RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
     }
     else if (material.type == MaterialType::Metal)
     {
@@ -119,6 +124,30 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
         ray.Direction =
             normalize(reflected + randomInUnitSphere(DispatchRaysIndex().xy, fract(payload.timeVal)) * material.fuzz);
         scatter = (dot(ray.Direction, normal) > 0);
+        rayFlags |= RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+    }
+    else if (material.type == MaterialType::Dielectric)
+    {
+        attenuation = float3(1.f, 1.f, 1.f);
+        float refractionRatio = isFrontFace ? (1.f / material.refractionIndex) : material.refractionIndex;
+
+        float cos_theta = min(dot(-WorldRayDirection(), normal), 1.f);
+        float sin_theta = sqrt(1.f - cos_theta * cos_theta);
+
+        bool cannot_refract = refractionRatio * sin_theta > 1.f;
+        float3 direction;
+        if (cannot_refract)
+        {
+            direction = reflect(WorldRayDirection(), normal);
+        }
+        else
+        {
+            direction = MyRefract(WorldRayDirection(), normal, refractionRatio);
+        }
+
+        ray.Origin = p;
+        ray.Direction = normalize(direction);
+        scatter = true;
     }
 
     if (scatter)
@@ -127,7 +156,7 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
         ray.TMin = 0.0001;
         ray.TMax = 10000.0;
 
-        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, currentPayload);
+        TraceRay(Scene, rayFlags, ~0, 0, 1, 0, ray, currentPayload);
 
         payload.color = float4(attenuation, 1.f) * currentPayload.color;
     }

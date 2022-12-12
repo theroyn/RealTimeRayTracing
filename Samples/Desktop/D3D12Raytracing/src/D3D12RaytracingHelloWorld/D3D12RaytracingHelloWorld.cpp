@@ -1046,21 +1046,20 @@ void D3D12RaytracingHelloWorld::InitializeMaterials()
     {
         PrimitiveMaterialBuffer center = {};
         center.type = MaterialType::Lambertian;
-        center.albedo = XMFLOAT3{ .7f, .3f, .3f };
+        center.albedo = XMFLOAT3{ .1f, .2f, .5f };
         m_materials.push_back(center);
     }
     {
         PrimitiveMaterialBuffer left = {};
-        left.type = MaterialType::Metal;
-        left.albedo = XMFLOAT3{ .8f, .8f, .8f };
-        left.fuzz = .3f;
+        left.type = MaterialType::Dielectric;
+        left.refractionIndex = 1.5f;
         m_materials.push_back(left);
     }
     {
         PrimitiveMaterialBuffer right = {};
         right.type = MaterialType::Metal;
         right.albedo = XMFLOAT3{ .8f, .6f, .2f };
-        right.fuzz = 1.f;
+        right.fuzz = 0.f;
         m_materials.push_back(right);
     }
 
