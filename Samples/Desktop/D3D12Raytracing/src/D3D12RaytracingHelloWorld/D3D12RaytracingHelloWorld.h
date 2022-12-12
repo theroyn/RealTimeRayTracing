@@ -151,6 +151,7 @@ private:
     UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse = UINT_MAX);
     UINT CreateBufferSRV(D3DBuffer* buffer, UINT numElements, UINT elementSize);
     void InitializeScene();
+    void InitializeSceneDemo(size_t sphereIdx);
     void InitializeMaterials();
     void AddSphereAndMaterial(size_t sphereIdx, const DirectX::XMMATRIX& transform, const MaterialInterface& material);
     void Log(const std::string& msg, const std::string& func, int line);

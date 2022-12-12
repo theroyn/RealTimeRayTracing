@@ -16,6 +16,7 @@
 
 #include <chrono>
 #include <ctime>
+#include <random>
 
 using namespace DX;
 
@@ -23,6 +24,29 @@ const wchar_t* D3D12RaytracingHelloWorld::c_hitGroupName = L"MyHitGroup";
 const wchar_t* D3D12RaytracingHelloWorld::c_raygenShaderName = L"MyRaygenShader";
 const wchar_t* D3D12RaytracingHelloWorld::c_closestHitShaderName = L"MyClosestHitShader";
 const wchar_t* D3D12RaytracingHelloWorld::c_missShaderName = L"MyMissShader";
+
+inline float random_float()
+{
+    static std::uniform_real_distribution<float> distribution(0.f, 1.f);
+    static std::mt19937 generator;
+    return distribution(generator);
+}
+inline float random_float(float min, float max)
+{
+    static std::uniform_real_distribution<float> distribution(min, max);
+    static std::mt19937 generator;
+    return distribution(generator);
+}
+
+inline XMFLOAT3 random3()
+{
+    return XMFLOAT3{ random_float(), random_float(), random_float() };
+}
+
+inline XMFLOAT3 random3(float min, float max)
+{
+    return XMFLOAT3{ random_float(min, max), random_float(min, max), random_float(min, max) };
+}
 
 void D3D12RaytracingHelloWorld::Log(const std::string& msg, const std::string& func, int line)
 {
@@ -1071,6 +1095,76 @@ private:
     float refractionIndex;
 };
 
+void D3D12RaytracingHelloWorld::InitializeSceneDemo(size_t sphereIdx)
+{
+    using namespace DirectX;
+    DirectX::XMMATRIX mat;
+
+    // add ground
+    Lambertian ground(XMFLOAT3{ .5f, .5f, .5f });
+    mat = GetSphereTrans(XMFLOAT3{ 0.f, -1000.f, 0.f }, 1000.f);
+    AddSphereAndMaterial(sphereIdx, mat, ground);
+
+    for (int a = -2; a < 2; a++)
+    {
+        for (int b = -1; b < 1; b++)
+        {
+            float choose_mat = random_float();
+            XMVECTOR centerVec{ a + .9f * random_float(), .2f, b + .9f * random_float() };
+            XMFLOAT3 center;
+            XMStoreFloat3(&center, centerVec);
+            XMVECTOR lengthVec = XMVector3Length(centerVec - XMVECTOR{ 4.f, .2f, 0.f });
+            float length;
+            XMStoreFloat(&length, lengthVec);
+            if (length > .9f)
+            {
+                std::shared_ptr<MaterialInterface> sphereMaterial;
+
+                if (choose_mat < 0.8)
+                {
+                    // diffuse
+                    XMFLOAT3 rand1 = random3();
+                    XMFLOAT3 rand2 = random3();
+                    XMVECTOR albedoVec = XMLoadFloat3(&rand1) * XMLoadFloat3(&rand2);
+                    XMFLOAT3 albedo;
+                    XMStoreFloat3(&albedo, albedoVec);
+                    sphereMaterial = std::make_shared<Lambertian>(albedo);
+                    XMMATRIX trans = GetSphereTrans(center, .2f);
+                    AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
+                }
+                else if (choose_mat < 0.95)
+                {
+                    // metal
+                    XMFLOAT3 albedo = random3(.5f, 1.f);
+                    float fuzz = random_float(0.f, .5f);
+                    sphereMaterial = std::make_shared<Metal>(albedo, fuzz);
+                    XMMATRIX trans = GetSphereTrans(center, .2f);
+                    AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
+                }
+                else
+                {
+                    // glass
+                    sphereMaterial = std::make_shared<Dielectric>(1.5f);
+                    XMMATRIX trans = GetSphereTrans(center, .2f);
+                    AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
+                }
+            }
+        }
+    }
+
+    Dielectric material1(1.5);
+    XMMATRIX trans = GetSphereTrans(XMFLOAT3{ 0.f, 1.f, 0.f }, 1.f);
+    AddSphereAndMaterial(sphereIdx, trans, material1);
+
+    Lambertian material2(XMFLOAT3{ .4f, .2f, .1f });
+    trans = GetSphereTrans(XMFLOAT3{ -4.f, 1.f, 0.f }, 1.f);
+    AddSphereAndMaterial(sphereIdx, trans, material2);
+
+    Metal material3(XMFLOAT3{ .7f, .6f, .5f }, 0.f);
+    trans = GetSphereTrans(XMFLOAT3{ 4.f, 1.f, 0.f }, 1.f);
+    AddSphereAndMaterial(sphereIdx, trans, material3);
+}
+
 void D3D12RaytracingHelloWorld::InitializeScene()
 {
     // size_t sphereIdx = m_scene.LoadModel("skull_obj/Skull.obj");
@@ -1078,25 +1172,25 @@ void D3D12RaytracingHelloWorld::InitializeScene()
     // size_t sphereIdx = m_scene.LoadModel("SphereRad1.obj");
     //  size_t sphereIdx = m_scene.LoadModel("knight/knight.obj");
     // size_t sphereIdx = m_scene.LoadModel("backpack/backpack.obj");
+    InitializeSceneDemo(sphereIdx);
+    // DirectX::XMMATRIX mat;
 
-    DirectX::XMMATRIX mat;
+    // Lambertian ground(XMFLOAT3{ 0.8f, 0.8f, 0.f });
+    // Lambertian center(XMFLOAT3{ .1f, .2f, .5f });
+    // Dielectric left(1.5f);
+    // Metal right(XMFLOAT3{ .8f, .6f, .2f }, 0.f);
 
-    Lambertian ground(XMFLOAT3{ 0.8f, 0.8f, 0.f });
-    Lambertian center(XMFLOAT3{ .1f, .2f, .5f });
-    Dielectric left(1.5f);
-    Metal right(XMFLOAT3{ .8f, .6f, .2f }, 0.f);
-
-    mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
-    AddSphereAndMaterial(sphereIdx, mat, ground);
-    mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
-    AddSphereAndMaterial(sphereIdx, mat, center);
-    mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
-    AddSphereAndMaterial(sphereIdx, mat, left);
-    // negative radius for a "bubble" dielectric:
-    mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, -.45f);
-    AddSphereAndMaterial(sphereIdx, mat, left);
-    mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
-    AddSphereAndMaterial(sphereIdx, mat, right);
+    // mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
+    // AddSphereAndMaterial(sphereIdx, mat, ground);
+    // mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
+    // AddSphereAndMaterial(sphereIdx, mat, center);
+    // mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
+    // AddSphereAndMaterial(sphereIdx, mat, left);
+    //// negative radius for a "bubble" dielectric:
+    // mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, -.45f);
+    // AddSphereAndMaterial(sphereIdx, mat, left);
+    // mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
+    // AddSphereAndMaterial(sphereIdx, mat, right);
 }
 
 void D3D12RaytracingHelloWorld::InitializeMaterials()
