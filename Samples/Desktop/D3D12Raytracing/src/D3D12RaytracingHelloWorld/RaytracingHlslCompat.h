@@ -43,13 +43,19 @@ struct RayGenConstantBuffer
     float timeNow;
 
     XMFLOAT3 leftCorner;
-    float pad1;
+    float lensRadius;
 
     XMFLOAT3 vpHorizontal;
-    float pad2;
+    float pad1;
 
     XMFLOAT3 vpVertical;
-    float pad3[9];
+    float pad2;
+
+    XMFLOAT3 right;
+    float pad3;
+
+    XMFLOAT3 up;
+    float pad4;
 };
 
 struct Vertex
@@ -62,7 +68,7 @@ namespace MaterialType
 {
 enum Type
 {
-    None, // sanity check
+    None,       // sanity check
     Lambertian, // Lambertian scattering
     Metal,
     Dielectric,

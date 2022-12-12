@@ -173,10 +173,21 @@ float gold(in float2 xy, in float seed)
     return gold_noise(DispatchRaysIndex().xy, seed + 0.1f);
 }
 
+float gold(in float2 xy, in float seed, float min, float max)
+{
+    return gold(xy, seed) * (max - min) + min;
+}
+
 float2 gold2(in float2 xy, in float seed)
 {
     return float2(gold_noise(DispatchRaysIndex().xy, seed + 0.1f), gold_noise(DispatchRaysIndex().xy, seed + 0.2f));
 }
+
+float2 gold2(in float2 xy, in float seed, float min, float max)
+{
+    return gold2(xy, seed) * (max - min) + min;
+}
+
 float3 gold3(in float2 xy, in float seed)
 {
     return float3(gold_noise(DispatchRaysIndex().xy, seed + 0.1f), gold_noise(DispatchRaysIndex().xy, seed + 0.2f),
@@ -194,6 +205,17 @@ float3 randomInUnitSphere(float2 uv, float timeVal)
     {
         float3 p = gold3(uv, timeVal, -1.f, 1.f);
 
+        if (lengthSquared(p) >= 1.f)
+            continue;
+        return p;
+    }
+}
+
+float3 randomInUnitDisk(float2 uv, float timeVal)
+{
+    while (true)
+    {
+        float3 p = float3(gold2(uv, timeVal, -1.f, 1.f), 0.f);
         if (lengthSquared(p) >= 1.f)
             continue;
         return p;

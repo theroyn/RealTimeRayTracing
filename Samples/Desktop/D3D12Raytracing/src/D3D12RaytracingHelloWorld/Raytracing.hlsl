@@ -44,13 +44,18 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
         float3 currentPixel = g_rayGenCB.leftCorner.xyz + lerpValues.x * g_rayGenCB.vpHorizontal +
                               (1.f - lerpValues.y) * g_rayGenCB.vpVertical;
 
+        // for focus distance in lens approximation
+        float3 rd =
+            g_rayGenCB.lensRadius * randomInUnitDisk(DispatchRaysDimensions().xy, fract(g_rayGenCB.timeNow) + stepPart);
+        float3 offset = g_rayGenCB.right * rd.x + g_rayGenCB.up * rd.y;
+
         payload.color = float4(0.f, 0.f, 0.f, 0.f);
         payload.timeVal = g_rayGenCB.timeNow + stepPart;
         payload.currentRecursionDepth = 0;
 
         RayDesc ray;
-        ray.Origin = g_rayGenCB.origin;
-        ray.Direction = normalize(currentPixel - g_rayGenCB.origin);
+        ray.Origin = g_rayGenCB.origin + offset;
+        ray.Direction = normalize(currentPixel - g_rayGenCB.origin - offset);
         // Set TMin to a non-zero small value to avoid aliasing issues due to floating - point errors.
         // TMin should be kept small to prevent missing geometry at close contact areas.
         ray.TMin = 0.001;

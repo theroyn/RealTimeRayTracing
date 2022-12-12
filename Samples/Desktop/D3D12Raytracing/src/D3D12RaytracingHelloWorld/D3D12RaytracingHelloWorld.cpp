@@ -67,45 +67,37 @@ D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, st
 
 void D3D12RaytracingHelloWorld::InitializeCamera()
 {
-    XMVECTOR lookfrom{ 0.f, 0.f, 0.f, 1.f };
+    using namespace DirectX;
+    XMVECTOR lookfrom{ 3.f, 3.f, 2.f, 1.f };
     XMVECTOR lookat{ 0.f, 0.f, -1.f, 1.f };
     XMVECTOR vup{ 0., 1., 0. };
-    float vfov = 90.f;
-    m_cam = std::make_shared<Camera>(lookfrom, lookat, vup, vfov);
-}
-
-static constexpr float PI = 3.1415926535897932385f;
-
-static inline float degrees_to_radians(float degrees)
-{
-    return degrees * PI / 180.f;
+    float vfov = 20.f;
+    XMVECTOR focusDistVec = XMVector3Length(lookfrom - lookat);
+    float focusDist;
+    XMStoreFloat(&focusDist, focusDistVec);
+    m_cam = std::make_shared<Camera>(lookfrom, lookat, vup, vfov, 2.f, focusDist);
 }
 
 void D3D12RaytracingHelloWorld::UpdateCamera()
 {
     using namespace DirectX;
+    m_cam->UpdateAspectRatio((float)GetWidth() / (float)GetHeight());
     XMVECTOR lookfrom = m_cam->GetLookFrom();
-    XMVECTOR forward = m_cam->GetForward();
     XMVECTOR up = m_cam->GetUp();
     XMVECTOR right = m_cam->GetRight();
-    float vfov = m_cam->GetVFOV();
 
-    float theta = degrees_to_radians(vfov);
-    float h = tan(theta / 2);
-    float aspectRatio = (float)GetWidth() / (float)GetHeight();
-    float vpHeight = 2.f * h;
-    float vpWidth = aspectRatio * vpHeight;
-    float focalLength = 1.f;
-
-    XMVECTOR vpHorizontal = vpWidth * right;
-    XMVECTOR vpVertical = vpHeight * up;
-
-    XMVECTOR leftCorner = lookfrom + focalLength * forward - 0.5f * vpHorizontal - 0.5 * vpVertical;
+    XMVECTOR vpHorizontal;
+    XMVECTOR vpVertical;
+    XMVECTOR leftCorner = m_cam->GetLowerLeft(vpHorizontal, vpVertical);
+    float lensRadius = m_cam->GetLensRadius();
 
     XMStoreFloat3(&m_rayGenCB.origin, lookfrom);
     XMStoreFloat3(&m_rayGenCB.leftCorner, leftCorner);
     XMStoreFloat3(&m_rayGenCB.vpHorizontal, vpHorizontal);
     XMStoreFloat3(&m_rayGenCB.vpVertical, vpVertical);
+    XMStoreFloat3(&m_rayGenCB.up, up);
+    XMStoreFloat3(&m_rayGenCB.right, right);
+    m_rayGenCB.lensRadius = lensRadius;
 }
 
 void D3D12RaytracingHelloWorld::OnInit()
@@ -1036,24 +1028,17 @@ void D3D12RaytracingHelloWorld::InitializeScene()
     DirectX::XMMATRIX mat;
     float R = cos(PI / 4);
 
-    mat = GetSphereTrans(XMFLOAT3{ -R, 0.f, -1.f }, R);
+    mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
+    m_scene.AddInstance(sphereIdx, mat, GROUND);
+    mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
+    m_scene.AddInstance(sphereIdx, mat, CENTER);
+    mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
+    // negative radius for a "bubble" dielectric:
     m_scene.AddInstance(sphereIdx, mat, LEFT);
-    mat = GetSphereTrans(XMFLOAT3{ R, 0.f, -1.f }, R);
+    mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, -.45f);
+    m_scene.AddInstance(sphereIdx, mat, LEFT);
+    mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
     m_scene.AddInstance(sphereIdx, mat, RIGHT);
-    /*  mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
-      m_scene.AddInstance(sphereIdx, mat, GROUND);
-      mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
-      m_scene.AddInstance(sphereIdx, mat, CENTER);
-      mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
-      m_scene.AddInstance(sphereIdx, mat, LEFT);*/
-    /**
-     * negative radius for a "bubble" dielectric:
-     *     mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, -.4f);
-     *     m_scene.AddInstance(sphereIdx, mat, LEFT);
-     */
-    // world.add(make_shared<sphere>(point3(-1.0, 0.0, -1.0), -0.4, material_left));
-    // mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
-    // m_scene.AddInstance(sphereIdx, mat, RIGHT);
 }
 
 void D3D12RaytracingHelloWorld::InitializeMaterials()
@@ -1073,15 +1058,14 @@ void D3D12RaytracingHelloWorld::InitializeMaterials()
     }
     {
         PrimitiveMaterialBuffer left = {};
-        left.type = MaterialType::Lambertian;
-        left.albedo = XMFLOAT3{ 0.f, 0.f, 1.f };
+        left.type = MaterialType::Dielectric;
         left.refractionIndex = 1.5f;
         m_materials.push_back(left);
     }
     {
         PrimitiveMaterialBuffer right = {};
-        right.type = MaterialType::Lambertian;
-        right.albedo = XMFLOAT3{ 1.f, 0.f, 0.f };
+        right.type = MaterialType::Metal;
+        right.albedo = XMFLOAT3{ .8f, .6f, .2f };
         right.fuzz = 0.f;
         m_materials.push_back(right);
     }

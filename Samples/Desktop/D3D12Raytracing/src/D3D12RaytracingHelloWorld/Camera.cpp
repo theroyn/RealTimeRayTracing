@@ -4,6 +4,11 @@
 
 using namespace DirectX;
 
+static inline float degrees_to_radians(float degrees)
+{
+    return degrees * PI / 180.f;
+}
+
 DirectX::XMVECTOR Camera::GetRight() const
 {
     return XMVector3Normalize(XMVector3Cross(GetForward(), vup));
@@ -28,13 +33,29 @@ DirectX::XMVECTOR Camera::GetLookAt() const
     return lookAt;
 }
 
-float Camera::GetVFOV() const
+DirectX::XMVECTOR Camera::GetLowerLeft(XMVECTOR& vpHorizontal, XMVECTOR& vpVertical) const
 {
-    return vfov;
+    XMVECTOR lookfrom = GetLookFrom();
+    XMVECTOR forward = GetForward();
+    XMVECTOR up = GetUp();
+    XMVECTOR right = GetRight();
+
+    float theta = degrees_to_radians(vfov);
+    float h = tan(theta / 2);
+    float vpHeight = 2.f * h;
+    float vpWidth = aspectRatio * vpHeight;
+
+    vpHorizontal = focusDist * vpWidth * right;
+    vpVertical = focusDist * vpHeight * up;
+
+    XMVECTOR leftCorner = lookfrom + focusDist * forward - 0.5f * vpHorizontal - 0.5 * vpVertical;
+
+    return leftCorner;
 }
 
-Camera::Camera(DirectX::XMVECTOR pos, DirectX::XMVECTOR lookAt, DirectX::XMVECTOR up, float vfov)
-    : lookFrom(pos), lookAt(lookAt), vup(up), vfov(vfov)
+Camera::Camera(DirectX::XMVECTOR pos, DirectX::XMVECTOR lookAt, DirectX::XMVECTOR up, float vfov, float aperture,
+               float focusDist)
+    : lookFrom(pos), lookAt(lookAt), vup(up), vfov(vfov), aperture(aperture), focusDist(focusDist)
 {
     // transform = XMMatrixTranspose(XMMatrixLookAtRH(pos, lookAt, up));
 }
