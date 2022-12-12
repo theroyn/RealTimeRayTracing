@@ -26,6 +26,7 @@ public:
     void MoveRight(float d);
     void Zoom(float d);
     void ChangeAperture(float d);
+    void ChangeFocusDistance(float d);
     void UpdateAspectRatio(float aspectRatio)
     {
         this->aspectRatio = aspectRatio;
@@ -35,8 +36,8 @@ private:
     DirectX::XMVECTOR lookFrom;
     DirectX::XMVECTOR lookAt;
     DirectX::XMVECTOR vup;
-    float rotationSpeed = .005f;
-    float moveSpeed = .1f;
+    float rotationSpeed = .002f;
+    float moveSpeed = .3f;
     float vfov;
     float aspectRatio = 1.f; // temporary value since there is no window yet
     float aperture;

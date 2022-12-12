@@ -98,6 +98,12 @@ void Camera::Zoom(float d)
 
 void Camera::ChangeAperture(float d)
 {
-    static constexpr float APERTURE_SPEED = .01f;
+    static constexpr float APERTURE_SPEED = .003f;
     aperture += APERTURE_SPEED * d;
+}
+
+void Camera::ChangeFocusDistance(float d)
+{
+    static constexpr float FOCUS_SPEED = .8f;
+    focusDist += FOCUS_SPEED * d;
 }

@@ -28,7 +28,7 @@ const wchar_t* D3D12RaytracingHelloWorld::c_missShaderName = L"MyMissShader";
 inline float random_float()
 {
     static std::uniform_real_distribution<float> distribution(0.f, 1.f);
-    static std::mt19937 generator;
+    static std::mt19937 generator(time(nullptr));
     return distribution(generator);
 }
 inline float random_float(float min, float max)
@@ -1007,13 +1007,13 @@ void D3D12RaytracingHelloWorld::OnKeyDown(UINT8 key)
         case 'E':
         case 'e':
         {
-            m_cam->ChangeAperture(1.f);
+            m_cam->ChangeFocusDistance(1.f);
         }
         break;
         case 'Q':
         case 'q':
         {
-            m_cam->ChangeAperture(-1.f);
+            m_cam->ChangeFocusDistance(-1.f);
         }
         break;
         case VK_CONTROL:
@@ -1137,22 +1137,22 @@ void D3D12RaytracingHelloWorld::InitializeSceneDemo(size_t sphereIdx)
     mat = GetSphereTrans(XMFLOAT3{ 0.f, -1000.f, 0.f }, 1000.f);
     AddSphereAndMaterial(sphereIdx, mat, ground);
 
-    for (int a = -2; a < 2; a++)
+    for (int a = -3; a < 2; a++)
     {
         for (int b = -1; b < 1; b++)
         {
             float choose_mat = random_float();
-            XMVECTOR centerVec{ a + .9f * random_float(), .2f, b + .9f * random_float() };
+            XMVECTOR centerVec{ a + .9f * random_float(-2.f, 2.f), .2f, b + .9f * random_float(-2.f, 2.f) };
             XMFLOAT3 center;
             XMStoreFloat3(&center, centerVec);
             XMVECTOR lengthVec = XMVector3Length(centerVec - XMVECTOR{ 4.f, .2f, 0.f });
             float length;
             XMStoreFloat(&length, lengthVec);
-            if (length > .9f)
+            if (1)
             {
                 std::shared_ptr<MaterialInterface> sphereMaterial;
 
-                if (choose_mat < 0.8)
+                if (choose_mat < 0.2)
                 {
                     // diffuse
                     XMFLOAT3 rand1 = random3();
@@ -1164,11 +1164,11 @@ void D3D12RaytracingHelloWorld::InitializeSceneDemo(size_t sphereIdx)
                     XMMATRIX trans = GetSphereTrans(center, .2f);
                     AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
                 }
-                else if (choose_mat < 0.95)
+                else if (choose_mat < 0.7)
                 {
                     // metal
                     XMFLOAT3 albedo = random3(.5f, 1.f);
-                    float fuzz = random_float(0.f, .5f);
+                    float fuzz = random_float(0.f, .1f);
                     sphereMaterial = std::make_shared<Metal>(albedo, fuzz);
                     XMMATRIX trans = GetSphereTrans(center, .2f);
                     AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);

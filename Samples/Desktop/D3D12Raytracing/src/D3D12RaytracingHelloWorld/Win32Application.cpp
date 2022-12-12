@@ -242,6 +242,12 @@ LRESULT CALLBACK Win32Application::WindowProc(HWND hWnd, UINT message, WPARAM wP
             GetClientRect(hWnd, &clientRect);
             pSample->OnSizeChanged(clientRect.right - clientRect.left, clientRect.bottom - clientRect.top,
                                    wParam == SIZE_MINIMIZED);
+            static bool done = false;
+            if (!done)
+            {
+                done = true;
+                ToggleFullscreenWindow(pSample->GetSwapchain());
+            }
         }
         return 0;
 
