@@ -630,8 +630,8 @@ void D3D12RaytracingHelloWorld::OnUpdate()
         m_rayGenCB.timeNow = timeInSeconds;
         UpdateCamera();
         InitRayGenTable();
-    /*    ReleaseWindowSizeDependentResources();
-        CreateWindowSizeDependentResources();*/
+        /*    ReleaseWindowSizeDependentResources();
+            CreateWindowSizeDependentResources();*/
     }
     catch (const std::exception& error)
     {
@@ -1018,25 +1018,48 @@ void D3D12RaytracingHelloWorld::InitializeScene()
 
     // DUDU refactor material indices
     //
-    // DirectX::XMMATRIX mat = DirectX::XMMatrixTranslation(0.f, 0.f, -1.f);
-    DirectX::XMMATRIX mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
-    m_scene.AddInstance(sphereIdx, mat, 0);
+    static constexpr size_t GROUND = 0;
+    static constexpr size_t CENTER = 1;
+    static constexpr size_t LEFT = 2;
+    static constexpr size_t RIGHT = 3;
+    DirectX::XMMATRIX mat;
+
     mat = GetSphereTrans(XMFLOAT3{ 0.f, -100.5f, -1.f }, 100.f);
-    m_scene.AddInstance(sphereIdx, mat, 0);
+    m_scene.AddInstance(sphereIdx, mat, GROUND);
+    mat = GetSphereTrans(XMFLOAT3{ 0.f, 0.f, -1.f }, .5f);
+    m_scene.AddInstance(sphereIdx, mat, CENTER);
+    mat = GetSphereTrans(XMFLOAT3{ -1.f, 0.f, -1.f }, .5f);
+    m_scene.AddInstance(sphereIdx, mat, LEFT);
+    mat = GetSphereTrans(XMFLOAT3{ 1.f, 0.f, -1.f }, .5f);
+    m_scene.AddInstance(sphereIdx, mat, RIGHT);
 }
 
 void D3D12RaytracingHelloWorld::InitializeMaterials()
 {
     // DUDU refactor
     {
-        PrimitiveMaterialBuffer material = {};
-        material.albedo = XMFLOAT3{ 1.f, .2f, .3f };
-        m_materials.push_back(material);
+        PrimitiveMaterialBuffer ground = {};
+        ground.type = MaterialType::Lambertian;
+        ground.albedo = XMFLOAT3{ 0.8f, 0.8f, 0.f };
+        m_materials.push_back(ground);
     }
     {
-        PrimitiveMaterialBuffer material = {};
-        material.albedo = XMFLOAT3{ .2f, .2f, .9f };
-        m_materials.push_back(material);
+        PrimitiveMaterialBuffer center = {};
+        center.type = MaterialType::Lambertian;
+        center.albedo = XMFLOAT3{ .7f, .3f, .3f };
+        m_materials.push_back(center);
+    }
+    {
+        PrimitiveMaterialBuffer left = {};
+        left.type = MaterialType::Metal;
+        left.albedo = XMFLOAT3{ .8f, .8f, .8f };
+        m_materials.push_back(left);
+    }
+    {
+        PrimitiveMaterialBuffer right = {};
+        right.type = MaterialType::Metal;
+        right.albedo = XMFLOAT3{ .8f, .6f, .2f };
+        m_materials.push_back(right);
     }
 
     auto device = m_deviceResources->GetD3DDevice();

@@ -32,7 +32,7 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
     float timeVal = sin(g_rayGenCB.timeNow * .01f) * .5f + .5f;
     float2 dims = DispatchRaysDimensions().xy;
     float2 uv = (float2)DispatchRaysIndex() / dims;
-    int samples_per_pixel = 30;
+    int samples_per_pixel = 10;
     float3 color = float3(0.f, 0.f, 0.f);
     for (int s = 0; s < samples_per_pixel; ++s)
     {
@@ -85,31 +85,55 @@ typedef BuiltInTriangleIntersectionAttributes MyAttributes;
 
     float3 normal = normalize(pInObjectSpace);
 
-    float2 dims = DispatchRaysDimensions().xy;
-
-    float2 uv = (float2)DispatchRaysIndex() / dims;
-
-    // float3 target = randomInHemisphere(normal, DispatchRaysIndex().xy, fract(payload.timeVal));
-    // Catch degenerate scatter direction
-    float3 target = normal + randomInUnitVector(DispatchRaysIndex().xy, fract(payload.timeVal));
-    if (nearZero(target))
+    RayPayload currentPayload = payload;
+    RayDesc ray;
+    float3 attenuation = float3(0.f, 0.f, 0.f);
+    PrimitiveMaterialBuffer material = g_materials[InstanceID()];
+    bool scatter = false;
+    if (material.type == MaterialType::Lambertian)
     {
-        target = normal;
+        attenuation = material.albedo;
+        float2 dims = DispatchRaysDimensions().xy;
+
+        float2 uv = (float2)DispatchRaysIndex() / dims;
+
+        // float3 target = randomInHemisphere(normal, DispatchRaysIndex().xy, fract(payload.timeVal));
+        // Catch degenerate scatter direction
+        float3 target = normal + randomInUnitVector(DispatchRaysIndex().xy, fract(payload.timeVal));
+        if (nearZero(target))
+        {
+            target = normal;
+        }
+
+        ray.Origin = p;
+        ray.Direction = normalize(target);
+        scatter = true;
+    }
+    else if (material.type == MaterialType::Metal)
+    {
+        //         vec3 reflected = reflect(unit_vector(r_in.direction()), rec.normal);
+        // scattered = ray(rec.p, reflected);
+        attenuation = material.albedo;
+        float3 reflected = reflect(WorldRayDirection(), normal);
+        ray.Origin = p;
+        ray.Direction = normalize(reflected);
+        scatter = (dot(ray.Direction, normal) > 0);
     }
 
-    RayPayload currentPayload = payload;
-    currentPayload.color = float4(0.f, 0.f, 0.f, 0.f);
+    if (scatter)
+    {
+        currentPayload.color = float4(0.f, 0.f, 0.f, 0.f);
+        ray.TMin = 0.0001;
+        ray.TMax = 10000.0;
 
-    RayDesc ray;
+        TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, currentPayload);
 
-    ray.Origin = p;
-    ray.Direction = normalize(target);
-    ray.TMin = 0.0001;
-    ray.TMax = 10000.0;
-
-    TraceRay(Scene, RAY_FLAG_CULL_BACK_FACING_TRIANGLES, ~0, 0, 1, 0, ray, currentPayload);
-
-    payload.color = .5f * currentPayload.color;
+        payload.color = float4(attenuation, 1.f) * currentPayload.color;
+    }
+    else
+    {
+        payload.color = float4(0.f, 0.f, 0.f, 0.f);
+    }
 }
 
 [shader("miss")] void MyMissShader(inout RayPayload payload)

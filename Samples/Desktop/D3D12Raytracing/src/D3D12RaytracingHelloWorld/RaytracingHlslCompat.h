@@ -62,10 +62,12 @@ namespace MaterialType
 {
 enum Type
 {
-    Default,
-    Matte,  // Lambertian scattering
-    Mirror, // Specular reflector that isn't modified by the Fresnel equations.
-    AnalyticalCheckerboardTexture
+    None, // sanity check
+    Lambertian, // Lambertian scattering
+    Metal,
+    Dielectric,
+
+    Count
 };
 }
 
