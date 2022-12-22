@@ -27,6 +27,10 @@ Build the D3D12Raytracing.sln solution and run the executable.
 
 The only dependency is [assimp](https://github.com/assimp/assimp), an asset loading library. The project currently build with version 5.2.5. You can build it from source and update the project's include directories and input libraries location.
 
+## Youtube Demo:
+
+[<img src="https://img.youtube.com/vi/N5Vw_xkd9WI/maxresdefault.jpg" width="50%">](https://youtu.be/N5Vw_xkd9WI)
+
 ## Resources I used
 * [Ray-Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
 * [DirectX Raytracing (DXR) Functional Spec](https://microsoft.github.io/DirectX-Specs/d3d/Raytracing.html)
