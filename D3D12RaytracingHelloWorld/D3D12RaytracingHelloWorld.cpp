@@ -28,7 +28,7 @@ const wchar_t* D3D12RaytracingHelloWorld::c_missShaderName = L"MyMissShader";
 inline float random_float()
 {
     static std::uniform_real_distribution<float> distribution(0.f, 1.f);
-    static std::mt19937 generator(time(nullptr));
+    static std::mt19937 generator(static_cast<unsigned int>(time(nullptr)));
     return distribution(generator);
 }
 inline float random_float(float min, float max)
