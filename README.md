@@ -29,7 +29,7 @@ The only dependency is [assimp](https://github.com/assimp/assimp), an asset load
 
 ## Youtube Demo:
 
-[<img src="https://img.youtube.com/vi/N5Vw_xkd9WI/maxresdefault.jpg" width="50%">](https://youtu.be/N5Vw_xkd9WI)
+[<img src="https://img.youtube.com/vi/FUbM8akUhyY/maxresdefault.jpg" width="50%">](https://youtu.be/FUbM8akUhyY)
 
 ## Resources I used
 * [Ray-Tracing in One Weekend](https://raytracing.github.io/books/RayTracingInOneWeekend.html)
