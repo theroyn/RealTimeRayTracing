@@ -181,7 +181,6 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="RaytracingShaderHelper.hlsli" />
-    <None Include="readme.md" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Raytracing.hlsl">

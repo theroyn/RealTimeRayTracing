@@ -1,13 +1,3 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
 #include "stdafx.h"
 
 #include "CompiledShaders\Raytracing.hlsl.h"
@@ -17,6 +7,8 @@
 #include <chrono>
 #include <ctime>
 #include <random>
+
+//#define LOGGING_ON
 
 using namespace DX;
 
@@ -67,9 +59,9 @@ void D3D12RaytracingHelloWorld::Log(const std::string& msg, const std::string& f
     m_logFd << timeStr << ":" << milliseconds.count() << ":" << func << ":" << line << " - " << msg << std::endl;
 }
 
-#define LOG(msg)                                                                                                       \
-    Log((msg), __FUNCTION__, __LINE__);                                                                                \
-    throw std::runtime_error(msg);
+#define LOG(msg)                      \
+  Log((msg), __FUNCTION__, __LINE__); \
+  throw std::runtime_error(msg);
 
 #define LOG_NOTHROW(msg) Log((msg), __FUNCTION__, __LINE__);
 
@@ -78,12 +70,14 @@ D3D12RaytracingHelloWorld::D3D12RaytracingHelloWorld(UINT width, UINT height, st
 {
     try
     {
+#if defined(LOGGING_ON)
         m_logFd.open("errorLog.txt", std::ios::app | std::ios::out);
         if (!m_logFd)
         {
             throw std::runtime_error("couldn't open log");
         }
         m_logFd << std::endl;
+#endif
         m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
 
         InitializeCamera();
@@ -228,7 +222,8 @@ void D3D12RaytracingHelloWorld::CreateRootSignatures()
     // This is a root signature that enables a shader to have unique arguments that come from shader tables.
     {
         CD3DX12_ROOT_PARAMETER rootParameters[LocalRootSignatureParams::Count];
-        rootParameters[LocalRootSignatureParams::ViewportConstantSlot].InitAsConstants(SizeOfInUint32(m_rayGenCB), 0,
+        rootParameters[LocalRootSignatureParams::ViewportConstantSlot].InitAsConstants(SizeOfInUint32(m_rayGenCB),
+                                                                                       0,
                                                                                        0);
         CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
         localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
@@ -345,12 +340,21 @@ void D3D12RaytracingHelloWorld::CreateRaytracingOutputResource()
     auto backbufferFormat = m_deviceResources->GetBackBufferFormat();
 
     // Create the output resource. The dimensions and format should match the swap-chain.
-    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backbufferFormat, m_width, m_height, 1, 1, 1, 0,
+    auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(backbufferFormat,
+                                                m_width,
+                                                m_height,
+                                                1,
+                                                1,
+                                                1,
+                                                0,
                                                 D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
     auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-    ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc,
-                                                  D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr,
+    ThrowIfFailed(device->CreateCommittedResource(&defaultHeapProperties,
+                                                  D3D12_HEAP_FLAG_NONE,
+                                                  &uavDesc,
+                                                  D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                                                  nullptr,
                                                   IID_PPV_ARGS(&m_raytracingOutput)));
     NAME_D3D12_OBJECT(m_raytracingOutput);
 
@@ -362,7 +366,8 @@ void D3D12RaytracingHelloWorld::CreateRaytracingOutputResource()
     device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
     m_raytracingOutputResourceUAVGpuDescriptor =
         CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(),
-                                      m_raytracingOutputResourceUAVDescriptorHeapIndex, m_descriptorSize);
+                                      m_raytracingOutputResourceUAVDescriptorHeapIndex,
+                                      m_descriptorSize);
 }
 
 void D3D12RaytracingHelloWorld::CreateDescriptorHeap()
@@ -408,7 +413,8 @@ UINT D3D12RaytracingHelloWorld::CreateBufferSRV(D3DBuffer* buffer, UINT numEleme
     UINT descriptorIndex = AllocateDescriptor(&buffer->cpuDescriptorHandle);
     device->CreateShaderResourceView(buffer->resource.Get(), &srvDesc, buffer->cpuDescriptorHandle);
     buffer->gpuDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(),
-                                                                descriptorIndex, m_descriptorSize);
+                                                                descriptorIndex,
+                                                                m_descriptorSize);
     return descriptorIndex;
 }
 
@@ -491,7 +497,9 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
     ComPtr<ID3D12Resource> scratchResource;
     AllocateUAVBuffer(device,
                       max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes),
-                      &scratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
+                      &scratchResource,
+                      D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+                      L"ScratchResource");
 
     // Allocate resources for acceleration structures.
     // Acceleration structures can only be placed in resources that are created in the default heap (or custom heap
@@ -506,10 +514,8 @@ void D3D12RaytracingHelloWorld::BuildAccelerationStructures()
     {
         D3D12_RESOURCE_STATES initialResourceState = D3D12_RESOURCE_STATE_RAYTRACING_ACCELERATION_STRUCTURE;
 
-        AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAccelerationStructure,
-                          initialResourceState, L"BottomLevelAccelerationStructure");
-        AllocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAccelerationStructure,
-                          initialResourceState, L"TopLevelAccelerationStructure");
+        AllocateUAVBuffer(device, bottomLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_bottomLevelAccelerationStructure, initialResourceState, L"BottomLevelAccelerationStructure");
+        AllocateUAVBuffer(device, topLevelPrebuildInfo.ResultDataMaxSizeInBytes, &m_topLevelAccelerationStructure, initialResourceState, L"TopLevelAccelerationStructure");
     }
 
     // Create an instance desc for the bottom-level acceleration structure.
@@ -654,8 +660,8 @@ void D3D12RaytracingHelloWorld::OnUpdate()
         CalculateFrameStats();
 
         float timeInSeconds = static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                     std::chrono::high_resolution_clock::now().time_since_epoch())
-                                                     .count());
+            std::chrono::high_resolution_clock::now().time_since_epoch())
+            .count());
 
         timeInSeconds /= 1'000.f;
 
@@ -663,7 +669,7 @@ void D3D12RaytracingHelloWorld::OnUpdate()
         UpdateCamera();
         InitRayGenTable();
         /*    ReleaseWindowSizeDependentResources();
-            CreateWindowSizeDependentResources();*/
+                CreateWindowSizeDependentResources();*/
     }
     catch (const std::exception& error)
     {
@@ -740,8 +746,8 @@ void D3D12RaytracingHelloWorld::CopyRaytracingOutputToBackbuffer()
     auto renderTarget = m_deviceResources->GetRenderTarget();
 
     D3D12_RESOURCE_BARRIER preCopyBarriers[2];
-    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_RENDER_TARGET,
-                                                              D3D12_RESOURCE_STATE_COPY_DEST);
+    preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget,
+                                                              D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
     preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
         m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
     commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
@@ -749,10 +755,10 @@ void D3D12RaytracingHelloWorld::CopyRaytracingOutputToBackbuffer()
     commandList->CopyResource(renderTarget, m_raytracingOutput.Get());
 
     D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget, D3D12_RESOURCE_STATE_COPY_DEST,
-                                                               D3D12_RESOURCE_STATE_PRESENT);
-    postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(
-        m_raytracingOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+    postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(renderTarget,
+                                                               D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+    postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_raytracingOutput.Get(),
+                                                               D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
     commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
 }
@@ -896,8 +902,8 @@ void D3D12RaytracingHelloWorld::CalculateFrameStats()
         std::wstringstream windowText;
 
         windowText << std::setprecision(2) << std::fixed << L"    fps: " << fps << L"     ~Million Primary Rays/s: "
-                   << MRaysPerSecond << L"    GPU[" << m_deviceResources->GetAdapterID() << L"]: "
-                   << m_deviceResources->GetAdapterDescription();
+            << MRaysPerSecond << L"    GPU[" << m_deviceResources->GetAdapterID() << L"]: "
+            << m_deviceResources->GetAdapterDescription();
         SetCustomWindowText(windowText.str().c_str());
     }
 }
@@ -1066,8 +1072,8 @@ DirectX::XMMATRIX GetSphereTrans(XMFLOAT3 pos, float rad)
     return mat;
 }
 
-void D3D12RaytracingHelloWorld::AddSphereAndMaterial(size_t sphereIdx, const DirectX::XMMATRIX& transform,
-                                                     const MaterialInterface& material)
+void D3D12RaytracingHelloWorld::AddSphereAndMaterial(size_t sphereIdx,
+                                                     const DirectX::XMMATRIX& transform, const MaterialInterface& material)
 {
     m_materials.push_back(material.GetMaterial());
     size_t materialIdx = m_materials.size() - 1;
@@ -1148,38 +1154,36 @@ void D3D12RaytracingHelloWorld::InitializeSceneDemo(size_t sphereIdx)
             XMVECTOR lengthVec = XMVector3Length(centerVec - XMVECTOR{ 4.f, .2f, 0.f });
             float length;
             XMStoreFloat(&length, lengthVec);
-            if (1)
-            {
-                std::shared_ptr<MaterialInterface> sphereMaterial;
 
-                if (choose_mat < 0.2)
-                {
-                    // diffuse
-                    XMFLOAT3 rand1 = random3();
-                    XMFLOAT3 rand2 = random3();
-                    XMVECTOR albedoVec = XMLoadFloat3(&rand1) * XMLoadFloat3(&rand2);
-                    XMFLOAT3 albedo;
-                    XMStoreFloat3(&albedo, albedoVec);
-                    sphereMaterial = std::make_shared<Lambertian>(albedo);
-                    XMMATRIX trans = GetSphereTrans(center, .2f);
-                    AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
-                }
-                else if (choose_mat < 0.7)
-                {
-                    // metal
-                    XMFLOAT3 albedo = random3(.5f, 1.f);
-                    float fuzz = random_float(0.f, .1f);
-                    sphereMaterial = std::make_shared<Metal>(albedo, fuzz);
-                    XMMATRIX trans = GetSphereTrans(center, .2f);
-                    AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
-                }
-                else
-                {
-                    // glass
-                    sphereMaterial = std::make_shared<Dielectric>(1.5f);
-                    XMMATRIX trans = GetSphereTrans(center, .2f);
-                    AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
-                }
+            std::shared_ptr<MaterialInterface> sphereMaterial;
+
+            if (choose_mat < 0.2)
+            {
+                // diffuse
+                XMFLOAT3 rand1 = random3();
+                XMFLOAT3 rand2 = random3();
+                XMVECTOR albedoVec = XMLoadFloat3(&rand1) * XMLoadFloat3(&rand2);
+                XMFLOAT3 albedo;
+                XMStoreFloat3(&albedo, albedoVec);
+                sphereMaterial = std::make_shared<Lambertian>(albedo);
+                XMMATRIX trans = GetSphereTrans(center, .2f);
+                AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
+            }
+            else if (choose_mat < 0.7)
+            {
+                // metal
+                XMFLOAT3 albedo = random3(.5f, 1.f);
+                float fuzz = random_float(0.f, .1f);
+                sphereMaterial = std::make_shared<Metal>(albedo, fuzz);
+                XMMATRIX trans = GetSphereTrans(center, .2f);
+                AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
+            }
+            else
+            {
+                // glass
+                sphereMaterial = std::make_shared<Dielectric>(1.5f);
+                XMMATRIX trans = GetSphereTrans(center, .2f);
+                AddSphereAndMaterial(sphereIdx, trans, *sphereMaterial);
             }
         }
     }
