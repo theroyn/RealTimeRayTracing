@@ -20,7 +20,7 @@ At the 2018 Game Developer's Conference, Microsoft introduced an addition to Dir
 * sending rays fron the camera and letting them bounce in the scene
 * constructing a scene containing matte, metal, and glass (dielectric) materials.
 
-The output result is a single image which can take even **an hour** to render. My project, depending on the GPU that runs it and the parameter number of samples per pixel, can render at **30 frames per second**.
+The output result is a single image which can take even **an hour** to render. My project, depending on the GPU that runs it and the parameter number of samples per pixel, can render at **30 frames per second**
 
 ## Building
 Build the D3D12Raytracing.sln solution and run the executable.
